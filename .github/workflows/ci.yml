@@ -86,7 +86,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       # The release renders install.yaml into the checkout too.
       - run: touch install.yaml
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --snapshot --clean --skip=publish
