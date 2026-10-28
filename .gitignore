@@ -1,0 +1,12 @@
+/bin/
+/dist/
+/deploy/install.yaml
+# The release workflow renders this next to the checkout; GoReleaser refuses
+# to run on untracked files.
+/install.yaml
+*.tgz
+node_modules/
+web/dist/*
+!web/dist/.gitkeep
+.DS_Store
+*.tsbuildinfo

@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clusterview.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "clusterview.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clusterview.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "clusterview.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: clusterview
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--addr=:{{ .Values.service.port }}"]
+          env:
+            - name: CLUSTERVIEW_NAMESPACES
+              value: {{ join "," .Values.scope.namespaces | quote }}
+            - name: CLUSTERVIEW_NODES
+              value: {{ .Values.scope.nodes | quote }}
+            - name: CLUSTERVIEW_ACTIONS
+              value: {{ .Values.actions.enabled | quote }}
+            - name: CLUSTERVIEW_ACTIONS_NAMESPACES
+              value: {{ join "," (.Values.actions.namespaces | default .Values.scope.namespaces) | quote }}
+            - name: CLUSTERVIEW_ACTIONS_MAX_REPLICAS
+              value: {{ .Values.actions.maxReplicas | quote }}
+            - name: CLUSTERVIEW_AUTH
+              value: {{ .Values.auth.mode | quote }}
+            - name: CLUSTERVIEW_AUTH_VIEWERS
+              value: {{ join "," .Values.auth.viewers | quote }}
+            - name: CLUSTERVIEW_AUTH_OPERATORS
+              value: {{ join "," .Values.auth.operators | quote }}
+            {{- if eq .Values.auth.mode "proxy" }}
+            - name: CLUSTERVIEW_AUTH_USER_HEADER
+              value: {{ .Values.auth.proxy.userHeader | quote }}
+            - name: CLUSTERVIEW_AUTH_GROUPS_HEADER
+              value: {{ .Values.auth.proxy.groupsHeader | quote }}
+            {{- end }}
+            {{- if eq .Values.auth.mode "oidc" }}
+            - name: CLUSTERVIEW_OIDC_ISSUER
+              value: {{ required "auth.oidc.issuerURL is required in oidc mode" .Values.auth.oidc.issuerURL | quote }}
+            - name: CLUSTERVIEW_OIDC_CLIENT_ID
+              value: {{ required "auth.oidc.clientID is required in oidc mode" .Values.auth.oidc.clientID | quote }}
+            - name: CLUSTERVIEW_OIDC_REDIRECT_URL
+              value: {{ required "auth.oidc.redirectURL is required in oidc mode" .Values.auth.oidc.redirectURL | quote }}
+            - name: CLUSTERVIEW_OIDC_SCOPES
+              value: {{ join "," .Values.auth.oidc.scopes | quote }}
+            - name: CLUSTERVIEW_OIDC_GROUPS_CLAIM
+              value: {{ .Values.auth.oidc.groupsClaim | quote }}
+            {{- end }}
+            {{- with .Values.auth.existingSecret }}
+            - name: CLUSTERVIEW_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: clientSecret, optional: true}
+            - name: CLUSTERVIEW_SESSION_KEY
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: sessionKey, optional: true}
+            {{- end }}
+            {{- with .Values.ai }}
+            {{- if .provider }}
+            - name: CLUSTERVIEW_AI_PROVIDER
+              value: {{ .provider | quote }}
+            - name: CLUSTERVIEW_AI_MODEL
+              value: {{ .model | quote }}
+            - name: CLUSTERVIEW_AI_BASE_URL
+              value: {{ .baseURL | quote }}
+            - name: CLUSTERVIEW_AI_DESCRIBE
+              value: {{ .describeServices | quote }}
+            {{- with .existingSecret }}
+            - name: CLUSTERVIEW_AI_API_KEY
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: apiKey}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.alerts.enabled }}
+            - name: CLUSTERVIEW_ALERTS_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "alerts.existingSecret is required when alerts are enabled" .Values.alerts.existingSecret | quote }}
+                  key: webhookURL
+            - name: CLUSTERVIEW_ALERTS_FORMAT
+              value: {{ .Values.alerts.format | quote }}
+            - name: CLUSTERVIEW_ALERTS_FOR
+              value: {{ .Values.alerts.for | quote }}
+            - name: CLUSTERVIEW_ALERTS_CLUSTER
+              value: {{ .Values.alerts.cluster | quote }}
+            - name: CLUSTERVIEW_ALERTS_DASHBOARD_URL
+              value: {{ .Values.alerts.dashboardURL | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

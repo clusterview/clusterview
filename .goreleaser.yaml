@@ -1,0 +1,53 @@
+# Laptop binaries for each release: clusterview, and the same program named
+# kubectl-clusterview so `kubectl clusterview` works once it's on the PATH.
+version: 2
+project_name: clusterview
+
+before:
+  hooks:
+    - sh -c "cd web && npm ci && npm run build && touch dist/.gitkeep"
+
+builds:
+  - &build
+    id: clusterview
+    main: ./cmd/clusterview
+    binary: clusterview
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/clusterview/clusterview/internal/version.Version={{ .Version }}
+      - -X github.com/clusterview/clusterview/internal/version.Commit={{ .ShortCommit }}
+  - <<: *build
+    id: kubectl-clusterview
+    binary: kubectl-clusterview
+
+archives:
+  - id: clusterview
+    ids: [clusterview]
+    name_template: "clusterview_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [README.md]
+  - id: kubectl-clusterview
+    ids: [kubectl-clusterview]
+    name_template: "kubectl-clusterview_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [README.md]
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  extra_files:
+    - glob: ./install.yaml
+
+changelog:
+  use: github

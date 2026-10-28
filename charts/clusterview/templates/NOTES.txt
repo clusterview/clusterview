@@ -1,0 +1,20 @@
+clusterview is installed with read-only access to the cluster.
+
+Open it:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "clusterview.fullname" . }} {{ .Values.service.port }}
+
+then visit http://localhost:{{ .Values.service.port }}
+{{- if .Values.ingress.enabled }}
+
+Or through the ingress:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- end }}
+{{- if and .Values.actions.enabled (eq .Values.auth.mode "none") }}
+
+Actions are on with no sign-in: anyone who can reach the dashboard can
+restart and scale workloads. Fine behind port-forward; set auth.mode before
+exposing it with an ingress.
+{{- end }}

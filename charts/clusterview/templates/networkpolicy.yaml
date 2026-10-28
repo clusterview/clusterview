@@ -1,0 +1,21 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "clusterview.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "clusterview.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: http
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,128 @@
+# Five broken services for checking Find error (docs/PLAN.md, phase 5):
+#   kubectl apply -f test/eval/failures.yaml && hack/find-error-eval.sh
+# Each has one real cause, noted in its clusterview.io/eval-cause annotation,
+# which clusterview never reads or sends.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cv-eval
+---
+# 1. Crash loop: the database it needs doesn't exist.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+  namespace: cv-eval
+  annotations:
+    clusterview.io/eval-cause: "Can't reach its database: orders-db doesn't exist (no such Service)"
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: orders-api}}
+  template:
+    metadata: {labels: {app: orders-api}}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.37
+          env:
+            - {name: DB_HOST, value: orders-db}
+            - {name: DB_PORT, value: "5432"}
+          command:
+            - sh
+            - -c
+            - |
+              echo "orders-api 2.4.1 starting"
+              echo "connecting to postgres at $DB_HOST:$DB_PORT"
+              if ! nc -z -w 2 "$DB_HOST" "$DB_PORT" 2>/tmp/err; then
+                echo "ERROR could not connect to postgres at $DB_HOST:$DB_PORT: $(cat /tmp/err)"
+                echo "FATAL giving up after 1 attempt"
+                exit 1
+              fi
+              sleep 3600
+---
+# 2. Out of memory: it needs more than its 32Mi limit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-builder
+  namespace: cv-eval
+  annotations:
+    clusterview.io/eval-cause: "Killed for using more memory than its 32Mi limit (OOMKilled)"
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: report-builder}}
+  template:
+    metadata: {labels: {app: report-builder}}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.37
+          command: [sh, -c, 'echo "loading monthly report into memory"; tail /dev/zero']
+          resources:
+            requests: {memory: 16Mi}
+            limits: {memory: 32Mi}
+---
+# 3. Bad image: the tag doesn't exist.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storefront
+  namespace: cv-eval
+  annotations:
+    clusterview.io/eval-cause: "The image tag nginx:1.299.0 doesn't exist, so it can't be pulled"
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: storefront}}
+  template:
+    metadata: {labels: {app: storefront}}
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.299.0
+---
+# 4. Missing config: the ConfigMap it reads was never created.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: cv-eval
+  annotations:
+    clusterview.io/eval-cause: "The ConfigMap checkout-config it reads its settings from doesn't exist"
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: checkout}}
+  template:
+    metadata: {labels: {app: checkout}}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.37
+          command: [sh, -c, 'echo "checkout ready, currency $CURRENCY"; sleep 3600']
+          env:
+            - name: CURRENCY
+              valueFrom:
+                configMapKeyRef: {name: checkout-config, key: currency}
+---
+# 5. Failing probe: the liveness probe checks a port nothing listens on.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-api
+  namespace: cv-eval
+  annotations:
+    clusterview.io/eval-cause: "The liveness probe checks port 8080 but nginx listens on 80, so Kubernetes keeps killing it"
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: search-api}}
+  template:
+    metadata: {labels: {app: search-api}}
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.29
+          ports: [{containerPort: 80}]
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2

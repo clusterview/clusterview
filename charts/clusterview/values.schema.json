@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository"]
+    },
+    "imagePullSecrets": { "type": "array" },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "properties": { "create": { "type": "boolean" } }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "namespaces": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "nodes": { "type": "boolean" }
+      }
+    },
+    "ai": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "enum": ["", "anthropic", "openai"] },
+        "model": { "type": "string" },
+        "baseURL": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "describeServices": { "type": "boolean" }
+      }
+    },
+    "alerts": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "format": { "type": "string", "enum": ["webhook", "slack", "teams"] },
+        "for": { "type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$" },
+        "cluster": { "type": "string" },
+        "dashboardURL": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "namespaces": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "maxReplicas": { "type": "integer", "minimum": 1, "maximum": 1000 }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "proxy", "oidc"] },
+        "viewers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "operators": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "proxy": {
+          "type": "object",
+          "properties": { "userHeader": { "type": "string", "minLength": 1 }, "groupsHeader": { "type": "string" } }
+        },
+        "oidc": {
+          "type": "object",
+          "properties": {
+            "issuerURL": { "type": "string" },
+            "clientID": { "type": "string" },
+            "redirectURL": { "type": "string" },
+            "scopes": { "type": "array", "items": { "type": "string" } },
+            "groupsClaim": { "type": "string" }
+          }
+        },
+        "existingSecret": { "type": "string" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string" },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "string" },
+                    "pathType": { "type": "string", "enum": ["Prefix", "Exact", "ImplementationSpecific"] }
+                  },
+                  "required": ["path", "pathType"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": { "type": "array" }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingressFrom": { "type": "array" }
+      }
+    },
+    "resources": { "type": "object" },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array" },
+    "affinity": { "type": "object" }
+  },
+  "additionalProperties": false
+}

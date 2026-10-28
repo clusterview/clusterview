@@ -1,0 +1,1030 @@
+{
+ "version": 1,
+ "fetchedAt": "2026-10-27T10:00:00Z",
+ "summary": {
+  "services": 14,
+  "workloads": 14,
+  "needAttention": 1,
+  "pods": 24,
+  "readyPods": 22,
+  "restarts": 29,
+  "namespaces": 5
+ },
+ "services": [
+  {
+   "id": "Deployment/shop/storefront",
+   "namespace": "shop",
+   "name": "storefront",
+   "title": "Storefront",
+   "category": "app",
+   "status": "healthy",
+   "ready": 3,
+   "desired": 3,
+   "workloads": [
+    "Deployment/shop/storefront"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "storefront",
+     "namespace": "shop",
+     "type": "ClusterIP",
+     "ports": [
+      "80"
+     ]
+    }
+   ],
+   "entrypoints": [
+    {
+     "host": "shop.acme.com",
+     "path": "/",
+     "tls": true,
+     "ingress": "shop/storefront",
+     "class": "nginx"
+    }
+   ],
+   "description": "The web shop customers browse and buy from.",
+   "descriptionSource": "annotation",
+   "app": "shop"
+  },
+  {
+   "id": "Deployment/shop/orders-api",
+   "namespace": "shop",
+   "name": "orders-api",
+   "title": "Orders API",
+   "category": "app",
+   "status": "healthy",
+   "ready": 2,
+   "desired": 2,
+   "workloads": [
+    "Deployment/shop/orders-api"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "orders-api",
+     "namespace": "shop",
+     "type": "ClusterIP",
+     "ports": [
+      "8080"
+     ]
+    }
+   ],
+   "entrypoints": [
+    {
+     "host": "api.acme.com",
+     "path": "/orders",
+     "tls": true,
+     "ingress": "shop/api",
+     "class": "nginx"
+    }
+   ],
+   "description": "Creates and tracks orders.",
+   "descriptionSource": "annotation",
+   "app": "shop"
+  },
+  {
+   "id": "Deployment/shop/payments-api",
+   "namespace": "shop",
+   "name": "payments-api",
+   "title": "Payments API",
+   "category": "app",
+   "status": "down",
+   "ready": 0,
+   "desired": 2,
+   "workloads": [
+    "Deployment/shop/payments-api"
+   ],
+   "problems": [
+    {
+     "kind": "crash-loop",
+     "severity": "critical",
+     "title": "Keeps crashing",
+     "detail": "Exits with code 1 (Error); restarted 14 times. Its logs show why.",
+     "pods": [
+      "payments-api-7c9f6d8b5-94hfx",
+      "payments-api-7c9f6d8b5-2jpfw"
+     ]
+    }
+   ],
+   "addresses": [
+    {
+     "name": "payments-api",
+     "namespace": "shop",
+     "type": "ClusterIP",
+     "ports": [
+      "8080"
+     ]
+    }
+   ],
+   "entrypoints": [],
+   "description": "Takes card payments through the payment provider.",
+   "descriptionSource": "annotation",
+   "app": "shop"
+  },
+  {
+   "id": "Deployment/shop/order-worker",
+   "namespace": "shop",
+   "name": "order-worker",
+   "title": "Order worker",
+   "category": "app",
+   "status": "healthy",
+   "ready": 3,
+   "desired": 3,
+   "workloads": [
+    "Deployment/shop/order-worker"
+   ],
+   "problems": [
+    {
+     "kind": "oom-recent",
+     "severity": "warning",
+     "title": "Ran out of memory recently",
+     "detail": "Killed for going over its memory limit of 256Mi at 09:41; restarted 2 times.",
+     "pods": [
+      "order-worker-5b8d7f9c6-dxczj"
+     ]
+    }
+   ],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Sends confirmations and updates stock for new orders.",
+   "descriptionSource": "annotation",
+   "app": "shop"
+  },
+  {
+   "id": "CronJob/shop/nightly-report",
+   "namespace": "shop",
+   "name": "nightly-report",
+   "title": "Nightly report",
+   "category": "job",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "CronJob/shop/nightly-report"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Emails yesterday's sales to the team.",
+   "descriptionSource": "annotation",
+   "app": "shop"
+  },
+  {
+   "id": "postgresql.cnpg.io/Cluster/data/orders-db",
+   "namespace": "data",
+   "name": "orders-db",
+   "title": "PostgreSQL",
+   "category": "database",
+   "status": "healthy",
+   "ready": 2,
+   "desired": 2,
+   "workloads": [
+    "Pod/data/orders-db-1"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "orders-db-rw",
+     "namespace": "data",
+     "type": "ClusterIP",
+     "ports": [
+      "5432"
+     ]
+    },
+    {
+     "name": "orders-db-ro",
+     "namespace": "data",
+     "type": "ClusterIP",
+     "ports": [
+      "5432"
+     ]
+    }
+   ],
+   "entrypoints": [],
+   "description": "PostgreSQL database run by CloudNativePG, with failover between its instances.",
+   "descriptionSource": "operator",
+   "managedBy": {
+    "apiVersion": "postgresql.cnpg.io/v1",
+    "kind": "Cluster",
+    "name": "orders-db"
+   }
+  },
+  {
+   "id": "rabbitmq.com/RabbitmqCluster/data/events",
+   "namespace": "data",
+   "name": "events",
+   "title": "RabbitMQ",
+   "category": "queue",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "StatefulSet/data/events-server"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "events",
+     "namespace": "data",
+     "type": "ClusterIP",
+     "ports": [
+      "5672",
+      "15672"
+     ]
+    }
+   ],
+   "entrypoints": [],
+   "description": "Message broker run by the RabbitMQ Cluster Operator. Holds work queues between services.",
+   "descriptionSource": "operator",
+   "managedBy": {
+    "apiVersion": "rabbitmq.com/v1beta1",
+    "kind": "RabbitmqCluster",
+    "name": "events"
+   }
+  },
+  {
+   "id": "Deployment/data/cache",
+   "namespace": "data",
+   "name": "cache",
+   "title": "Redis",
+   "category": "cache",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "Deployment/data/cache"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "cache",
+     "namespace": "data",
+     "type": "ClusterIP",
+     "ports": [
+      "6379"
+     ]
+    }
+   ],
+   "entrypoints": [],
+   "description": "In-memory store for caching, sessions and queues.",
+   "descriptionSource": "image"
+  },
+  {
+   "id": "Deployment/ingress-nginx/ingress-nginx-controller",
+   "namespace": "ingress-nginx",
+   "name": "ingress-nginx-controller",
+   "title": "NGINX Ingress",
+   "category": "ingress",
+   "status": "healthy",
+   "ready": 2,
+   "desired": 2,
+   "workloads": [
+    "Deployment/ingress-nginx/ingress-nginx-controller"
+   ],
+   "problems": [],
+   "addresses": [
+    {
+     "name": "ingress-nginx-controller",
+     "namespace": "ingress-nginx",
+     "type": "LoadBalancer",
+     "ports": [
+      "80/http",
+      "443/https"
+     ],
+     "external": [
+      "a1b2c3.elb.us-west-1.amazonaws.com"
+     ]
+    }
+   ],
+   "entrypoints": [],
+   "description": "Routes outside traffic into the cluster by host name and path.",
+   "descriptionSource": "image",
+   "app": "ingress-nginx"
+  },
+  {
+   "id": "StatefulSet/monitoring/prometheus",
+   "namespace": "monitoring",
+   "name": "prometheus",
+   "title": "Prometheus",
+   "category": "monitoring",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "StatefulSet/monitoring/prometheus"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Collects and stores metrics.",
+   "descriptionSource": "image"
+  },
+  {
+   "id": "Deployment/monitoring/grafana",
+   "namespace": "monitoring",
+   "name": "grafana",
+   "title": "Grafana",
+   "category": "monitoring",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "Deployment/monitoring/grafana"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Dashboards for metrics and logs.",
+   "descriptionSource": "image"
+  },
+  {
+   "id": "Deployment/kube-system/coredns",
+   "namespace": "kube-system",
+   "name": "coredns",
+   "title": "CoreDNS",
+   "category": "dns",
+   "status": "healthy",
+   "ready": 2,
+   "desired": 2,
+   "workloads": [
+    "Deployment/kube-system/coredns"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Cluster DNS: turns service names into addresses.",
+   "descriptionSource": "image"
+  },
+  {
+   "id": "DaemonSet/kube-system/kube-proxy",
+   "namespace": "kube-system",
+   "name": "kube-proxy",
+   "title": "kube-proxy",
+   "category": "network",
+   "status": "healthy",
+   "ready": 3,
+   "desired": 3,
+   "workloads": [
+    "DaemonSet/kube-system/kube-proxy"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Sends traffic for each Service to its pods, on every node.",
+   "descriptionSource": "image"
+  },
+  {
+   "id": "Deployment/kube-system/metrics-server",
+   "namespace": "kube-system",
+   "name": "metrics-server",
+   "title": "Metrics Server",
+   "category": "monitoring",
+   "status": "healthy",
+   "ready": 1,
+   "desired": 1,
+   "workloads": [
+    "Deployment/kube-system/metrics-server"
+   ],
+   "problems": [],
+   "addresses": [],
+   "entrypoints": [],
+   "description": "Collects CPU and memory use for autoscaling and kubectl top.",
+   "descriptionSource": "image"
+  }
+ ],
+ "links": [
+  {
+   "from": "Deployment/shop/storefront",
+   "to": "Deployment/shop/orders-api",
+   "via": "orders-api.shop",
+   "evidence": "env ORDERS_URL"
+  },
+  {
+   "from": "Deployment/shop/storefront",
+   "to": "Deployment/data/cache",
+   "via": "cache.data",
+   "evidence": "env REDIS_HOST"
+  },
+  {
+   "from": "Deployment/shop/orders-api",
+   "to": "postgresql.cnpg.io/Cluster/data/orders-db",
+   "via": "orders-db-rw.data",
+   "evidence": "env DATABASE_URL"
+  },
+  {
+   "from": "Deployment/shop/orders-api",
+   "to": "rabbitmq.com/RabbitmqCluster/data/events",
+   "via": "events.data",
+   "evidence": "env AMQP_URL"
+  },
+  {
+   "from": "Deployment/shop/orders-api",
+   "to": "Deployment/shop/payments-api",
+   "via": "payments-api.shop",
+   "evidence": "env PAYMENTS_URL"
+  },
+  {
+   "from": "Deployment/shop/payments-api",
+   "to": "postgresql.cnpg.io/Cluster/data/orders-db",
+   "via": "orders-db-rw.data",
+   "evidence": "env DATABASE_URL"
+  },
+  {
+   "from": "Deployment/shop/order-worker",
+   "to": "rabbitmq.com/RabbitmqCluster/data/events",
+   "via": "events.data",
+   "evidence": "env AMQP_URL"
+  },
+  {
+   "from": "Deployment/shop/order-worker",
+   "to": "postgresql.cnpg.io/Cluster/data/orders-db",
+   "via": "orders-db-rw.data",
+   "evidence": "env DATABASE_URL"
+  },
+  {
+   "from": "CronJob/shop/nightly-report",
+   "to": "postgresql.cnpg.io/Cluster/data/orders-db",
+   "via": "orders-db-ro.data",
+   "evidence": "env DATABASE_URL"
+  }
+ ],
+ "workloads": [
+  {
+   "id": "Deployment/shop/storefront",
+   "kind": "Deployment",
+   "namespace": "shop",
+   "name": "storefront",
+   "status": "healthy",
+   "desired": 3,
+   "ready": 3,
+   "available": 3,
+   "updated": 3,
+   "image": "ghcr.io/acme/storefront:2.4.1",
+   "imageTag": "2.4.1",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "storefront-ngq2cd9wf-pxcvj",
+     "namespace": "shop",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "storefront-ngq2cd9wf-drrdk",
+     "namespace": "shop",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "storefront-ngq2cd9wf-wrc9x",
+     "namespace": "shop",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": [],
+   "app": "shop",
+   "autoscaling": {
+    "min": 3,
+    "max": 12,
+    "current": 3,
+    "managedBy": "hpa"
+   }
+  },
+  {
+   "id": "Deployment/shop/orders-api",
+   "kind": "Deployment",
+   "namespace": "shop",
+   "name": "orders-api",
+   "status": "healthy",
+   "desired": 2,
+   "ready": 2,
+   "available": 2,
+   "updated": 2,
+   "image": "ghcr.io/acme/orders-api:1.18.0",
+   "imageTag": "1.18.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "orders-api-k22xcxxqc-kcwgm",
+     "namespace": "shop",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "orders-api-k22xcxxqc-gwfxm",
+     "namespace": "shop",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": [],
+   "app": "shop"
+  },
+  {
+   "id": "Deployment/shop/payments-api",
+   "kind": "Deployment",
+   "namespace": "shop",
+   "name": "payments-api",
+   "status": "down",
+   "desired": 2,
+   "ready": 0,
+   "available": 0,
+   "updated": 2,
+   "image": "ghcr.io/acme/payments-api:3.2.0",
+   "imageTag": "3.2.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "payments-api-7c9f6d8b5-94hfx",
+     "namespace": "shop",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": false,
+     "readyContainers": "0/1",
+     "restarts": 14,
+     "stuck": true,
+     "startedAt": "2026-10-26T04:00:00Z",
+     "reason": "CrashLoopBackOff"
+    },
+    {
+     "name": "payments-api-7c9f6d8b5-2jpfw",
+     "namespace": "shop",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": false,
+     "readyContainers": "0/1",
+     "restarts": 13,
+     "stuck": true,
+     "startedAt": "2026-10-26T04:00:00Z",
+     "reason": "CrashLoopBackOff"
+    }
+   ],
+   "problems": [
+    {
+     "kind": "crash-loop",
+     "severity": "critical",
+     "title": "Keeps crashing",
+     "detail": "Exits with code 1 (Error); restarted 14 times. Its logs show why.",
+     "pods": [
+      "payments-api-7c9f6d8b5-94hfx",
+      "payments-api-7c9f6d8b5-2jpfw"
+     ]
+    }
+   ],
+   "events": [
+    {
+     "reason": "BackOff",
+     "message": "Back-off restarting failed container app in pod payments-api-7c9f6d8b5-94hfx",
+     "object": "Pod/payments-api-7c9f6d8b5-94hfx",
+     "count": 61,
+     "lastSeen": "2026-10-27T09:59:40Z"
+    }
+   ],
+   "app": "shop"
+  },
+  {
+   "id": "Deployment/shop/order-worker",
+   "kind": "Deployment",
+   "namespace": "shop",
+   "name": "order-worker",
+   "status": "healthy",
+   "desired": 3,
+   "ready": 3,
+   "available": 3,
+   "updated": 3,
+   "image": "ghcr.io/acme/order-worker:1.18.0",
+   "imageTag": "1.18.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "order-worker-5b8d7f9c6-dxczj",
+     "namespace": "shop",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 2,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "order-worker-5b8d7f9c6-4wr7n",
+     "namespace": "shop",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "order-worker-5b8d7f9c6-xspmk",
+     "namespace": "shop",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [
+    {
+     "kind": "oom-recent",
+     "severity": "warning",
+     "title": "Ran out of memory recently",
+     "detail": "Killed for going over its memory limit of 256Mi at 09:41; restarted 2 times.",
+     "pods": [
+      "order-worker-5b8d7f9c6-dxczj"
+     ]
+    }
+   ],
+   "events": [],
+   "app": "shop",
+   "autoscaling": {
+    "min": 1,
+    "max": 3,
+    "current": 3,
+    "managedBy": "keda"
+   }
+  },
+  {
+   "id": "CronJob/shop/nightly-report",
+   "kind": "CronJob",
+   "namespace": "shop",
+   "name": "nightly-report",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "ghcr.io/acme/reports:0.9.2",
+   "imageTag": "0.9.2",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [],
+   "problems": [],
+   "events": [],
+   "app": "shop",
+   "schedule": "0 2 * * *",
+   "lastRun": "2026-10-27T02:00:00Z"
+  },
+  {
+   "id": "Pod/data/orders-db-1",
+   "kind": "Pod",
+   "namespace": "data",
+   "name": "orders-db-1",
+   "status": "healthy",
+   "desired": 2,
+   "ready": 2,
+   "available": 2,
+   "updated": 2,
+   "image": "ghcr.io/cloudnative-pg/postgresql:17.2",
+   "imageTag": "17.2",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "orders-db-1",
+     "namespace": "data",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "orders-db-2",
+     "namespace": "data",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": [],
+   "owner": {
+    "apiVersion": "postgresql.cnpg.io/v1",
+    "kind": "Cluster",
+    "name": "orders-db"
+   }
+  },
+  {
+   "id": "StatefulSet/data/events-server",
+   "kind": "StatefulSet",
+   "namespace": "data",
+   "name": "events-server",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "rabbitmq:4.1-management",
+   "imageTag": "4.1-management",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "events-server-0",
+     "namespace": "data",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": [],
+   "owner": {
+    "apiVersion": "rabbitmq.com/v1beta1",
+    "kind": "RabbitmqCluster",
+    "name": "events"
+   }
+  },
+  {
+   "id": "Deployment/data/cache",
+   "kind": "Deployment",
+   "namespace": "data",
+   "name": "cache",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "redis:7.4",
+   "imageTag": "7.4",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "cache-zdfvrh7ng-trc4d",
+     "namespace": "data",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  },
+  {
+   "id": "Deployment/ingress-nginx/ingress-nginx-controller",
+   "kind": "Deployment",
+   "namespace": "ingress-nginx",
+   "name": "ingress-nginx-controller",
+   "status": "healthy",
+   "desired": 2,
+   "ready": 2,
+   "available": 2,
+   "updated": 2,
+   "image": "registry.k8s.io/ingress-nginx/controller:v1.12.0",
+   "imageTag": "v1.12.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "ingress-nginx-controller-x89nn5pzt-x8sd9",
+     "namespace": "ingress-nginx",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "ingress-nginx-controller-x89nn5pzt-lt54d",
+     "namespace": "ingress-nginx",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": [],
+   "app": "ingress-nginx"
+  },
+  {
+   "id": "StatefulSet/monitoring/prometheus",
+   "kind": "StatefulSet",
+   "namespace": "monitoring",
+   "name": "prometheus",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "quay.io/prometheus/prometheus:v3.5.0",
+   "imageTag": "v3.5.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "prometheus-65m2x49sm-5q4pb",
+     "namespace": "monitoring",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  },
+  {
+   "id": "Deployment/monitoring/grafana",
+   "kind": "Deployment",
+   "namespace": "monitoring",
+   "name": "grafana",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "grafana/grafana:12.1.0",
+   "imageTag": "12.1.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "grafana-phzftcj7m-g6kqq",
+     "namespace": "monitoring",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  },
+  {
+   "id": "Deployment/kube-system/coredns",
+   "kind": "Deployment",
+   "namespace": "kube-system",
+   "name": "coredns",
+   "status": "healthy",
+   "desired": 2,
+   "ready": 2,
+   "available": 2,
+   "updated": 2,
+   "image": "registry.k8s.io/coredns/coredns:v1.12.1",
+   "imageTag": "v1.12.1",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "coredns-dhsqwlg9r-wl5rp",
+     "namespace": "kube-system",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "coredns-dhsqwlg9r-qkgdh",
+     "namespace": "kube-system",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  },
+  {
+   "id": "DaemonSet/kube-system/kube-proxy",
+   "kind": "DaemonSet",
+   "namespace": "kube-system",
+   "name": "kube-proxy",
+   "status": "healthy",
+   "desired": 3,
+   "ready": 3,
+   "available": 3,
+   "updated": 3,
+   "image": "registry.k8s.io/kube-proxy:v1.37.0",
+   "imageTag": "v1.37.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "kube-proxy-k4kbt9xhl-mbgrw",
+     "namespace": "kube-system",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "kube-proxy-k4kbt9xhl-zxng5",
+     "namespace": "kube-system",
+     "node": "ip-10-0-3-9",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    },
+    {
+     "name": "kube-proxy-k4kbt9xhl-z246c",
+     "namespace": "kube-system",
+     "node": "ip-10-0-2-14",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  },
+  {
+   "id": "Deployment/kube-system/metrics-server",
+   "kind": "Deployment",
+   "namespace": "kube-system",
+   "name": "metrics-server",
+   "status": "healthy",
+   "desired": 1,
+   "ready": 1,
+   "available": 1,
+   "updated": 1,
+   "image": "registry.k8s.io/metrics-server/metrics-server:v0.8.0",
+   "imageTag": "v0.8.0",
+   "createdAt": "2026-09-01T00:00:00Z",
+   "pods": [
+    {
+     "name": "metrics-server-748wqqqqf-t2qcj",
+     "namespace": "kube-system",
+     "node": "ip-10-0-1-21",
+     "phase": "Running",
+     "ready": true,
+     "readyContainers": "1/1",
+     "restarts": 0,
+     "stuck": false,
+     "startedAt": "2026-10-26T04:00:00Z"
+    }
+   ],
+   "problems": [],
+   "events": []
+  }
+ ]
+}

@@ -1,0 +1,225 @@
+/* Category tile */
+.cv-cat {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+/* Service card */
+.cv-card {
+  position: relative;
+  width: 264px;
+  padding: 12px 14px 12px 12px;
+  border-radius: var(--cv-radius);
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-1);
+  transition:
+    box-shadow var(--cv-med) var(--cv-ease),
+    border-color var(--cv-med) var(--cv-ease),
+    opacity var(--cv-med) var(--cv-ease),
+    transform var(--cv-med) var(--cv-ease);
+}
+
+.cv-card:hover {
+  box-shadow: var(--cv-shadow-2);
+  border-color: var(--cv-border-strong);
+}
+
+.cv-card.is-selected {
+  border-color: var(--cv-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv-accent) 22%, transparent), var(--cv-shadow-2);
+}
+
+.cv-card.is-dimmed {
+  opacity: 0.38;
+}
+
+.cv-card.is-degraded {
+  border-color: var(--cv-warn-line);
+  background: linear-gradient(180deg, var(--cv-warn-soft), var(--cv-surface) 70%);
+}
+
+.cv-card.is-down {
+  border-color: var(--cv-bad-line);
+  background: linear-gradient(180deg, var(--cv-bad-soft), var(--cv-surface) 75%);
+}
+
+.cv-card.is-idle .cv-card-title {
+  color: var(--cv-text-2);
+}
+
+/* The alarm: a soft red glow that breathes around a down service. */
+.cv-card-alarm {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: cv-alarm 2s var(--cv-ease) infinite;
+}
+
+@keyframes cv-alarm {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cv-bad) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--cv-bad) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cv-bad) 0%, transparent);
+  }
+}
+
+.cv-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cv-card-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.cv-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-card-sub {
+  margin: 1px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--cv-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.cv-card-sub .cv-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-dot-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* Status dot, top right */
+.cv-status {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  align-self: flex-start;
+  margin-top: 4px;
+  background: var(--cv-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv-ok) 18%, transparent);
+}
+
+.cv-status.is-warning,
+.cv-status.is-degraded {
+  background: var(--cv-warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv-warn) 20%, transparent);
+}
+
+.cv-status.is-down {
+  background: var(--cv-bad);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv-bad) 22%, transparent);
+}
+
+.cv-status.is-idle,
+.cv-status.is-unknown {
+  background: var(--cv-idle);
+  box-shadow: none;
+}
+
+.cv-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  min-height: 18px;
+  font-size: 12.5px;
+}
+
+.cv-replicas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.cv-replicas-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--cv-text-2);
+  font-weight: 560;
+}
+
+.cv-pips {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.cv-pip {
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--cv-ok);
+}
+
+.cv-pip.is-stuck {
+  background: var(--cv-bad);
+}
+
+.cv-pip.is-starting {
+  background: var(--cv-warn);
+}
+
+.cv-pip.is-missing {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--cv-border-strong);
+}
+
+.cv-pips-more {
+  font-size: 11px;
+  color: var(--cv-text-3);
+}
+
+.cv-card-desc,
+.cv-card-problem {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-card-desc {
+  color: var(--cv-text-3);
+}
+
+.cv-card-problem {
+  font-weight: 600;
+}
+
+.cv-card-problem.is-critical {
+  color: var(--cv-bad);
+}
+
+.cv-card-problem.is-warning {
+  color: var(--cv-warn);
+}

@@ -1,0 +1,112 @@
+{{- if .Values.rbac.create }}
+{{- /*
+Read-only. Deliberately left out: Secrets, ConfigMaps, pods/exec,
+pods/attach, pods/portforward and every write verb.
+
+Whole cluster (scope.namespaces empty): one ClusterRole with everything.
+Listed namespaces: a Role in each with the namespaced rules, and a ClusterRole
+with only nodes and their metrics when scope.nodes is on.
+*/}}
+{{- $namespaced := list
+  (dict "apiGroups" (list "") "resources" (list "pods" "services" "endpoints" "events" "persistentvolumeclaims" "replicationcontrollers") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "") "resources" (list "pods/log") "verbs" (list "get"))
+  (dict "apiGroups" (list "apps") "resources" (list "deployments" "replicasets" "statefulsets" "daemonsets") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "batch") "resources" (list "jobs" "cronjobs") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "autoscaling") "resources" (list "horizontalpodautoscalers") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "events.k8s.io") "resources" (list "events") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "discovery.k8s.io") "resources" (list "endpointslices") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "networking.k8s.io") "resources" (list "ingresses") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "metrics.k8s.io") "resources" (list "pods") "verbs" (list "get" "list"))
+}}
+{{- $clusterWide := list
+  (dict "apiGroups" (list "") "resources" (list "nodes" "namespaces" "persistentvolumes") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "apiextensions.k8s.io") "resources" (list "customresourcedefinitions") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "metrics.k8s.io") "resources" (list "nodes") "verbs" (list "get" "list"))
+}}
+{{- $nodesOnly := list
+  (dict "apiGroups" (list "") "resources" (list "nodes") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "metrics.k8s.io") "resources" (list "nodes") "verbs" (list "get" "list"))
+}}
+{{- $fullname := include "clusterview.fullname" . }}
+{{- $sa := include "clusterview.serviceAccountName" . }}
+{{- if empty .Values.scope.namespaces }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $fullname }}-reader
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+rules:
+  {{- toYaml (concat $namespaced $clusterWide) | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $fullname }}-reader
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $fullname }}-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ .Release.Namespace }}
+{{- else }}
+{{- range $ns := .Values.scope.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullname }}-reader
+  namespace: {{ $ns }}
+  labels:
+    {{- include "clusterview.labels" $ | nindent 4 }}
+rules:
+  {{- toYaml $namespaced | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullname }}-reader
+  namespace: {{ $ns }}
+  labels:
+    {{- include "clusterview.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fullname }}-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- if .Values.scope.nodes }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $fullname }}-nodes
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+rules:
+  {{- toYaml $nodesOnly | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $fullname }}-nodes
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $fullname }}-nodes
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,72 @@
+{{- if and .Values.rbac.create .Values.actions.enabled }}
+{{- /*
+The rights actions need, and nothing more: delete a pod (restart), patch a
+Deployment/StatefulSet/DaemonSet (rolling restart, scale), read autoscalers
+and CronJobs, create a Job from a CronJob, and write an Event recording who
+did what. A ClusterRole when actions apply everywhere; a Role per namespace
+when actions.namespaces (or scope.namespaces) lists them.
+*/}}
+{{- $rules := list
+  (dict "apiGroups" (list "") "resources" (list "pods") "verbs" (list "get" "delete"))
+  (dict "apiGroups" (list "apps") "resources" (list "deployments" "statefulsets" "daemonsets") "verbs" (list "get" "patch"))
+  (dict "apiGroups" (list "autoscaling") "resources" (list "horizontalpodautoscalers") "verbs" (list "list"))
+  (dict "apiGroups" (list "batch") "resources" (list "cronjobs") "verbs" (list "get"))
+  (dict "apiGroups" (list "batch") "resources" (list "jobs") "verbs" (list "create"))
+  (dict "apiGroups" (list "") "resources" (list "events") "verbs" (list "create"))
+}}
+{{- $actionNamespaces := .Values.actions.namespaces | default .Values.scope.namespaces }}
+{{- if empty $actionNamespaces }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "clusterview.fullname" . }}-operator
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+rules:
+  {{- toYaml $rules | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "clusterview.fullname" . }}-operator
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "clusterview.fullname" . }}-operator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "clusterview.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- else }}
+{{- range $ns := $actionNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "clusterview.fullname" $ }}-operator
+  namespace: {{ $ns }}
+  labels:
+    {{- include "clusterview.labels" $ | nindent 4 }}
+rules:
+  {{- toYaml $rules | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "clusterview.fullname" $ }}-operator
+  namespace: {{ $ns }}
+  labels:
+    {{- include "clusterview.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "clusterview.fullname" $ }}-operator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "clusterview.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- end }}

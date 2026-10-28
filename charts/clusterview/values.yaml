@@ -1,0 +1,136 @@
+image:
+  repository: ghcr.io/clusterview/clusterview
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # Defaults to the release's full name.
+  name: ""
+  annotations: {}
+
+rbac:
+  # Read-only access: workloads, pods, pod logs, events, Services, Ingresses,
+  # volumes, autoscalers and metrics, plus nodes for the nodes view. No
+  # Secrets, no ConfigMaps, no exec, no writes.
+  create: true
+
+scope:
+  # Watch only these namespaces, with a Role in each instead of cluster-wide
+  # read access. Empty: the whole cluster.
+  namespaces: []
+  # The nodes view reads nodes, which are cluster-wide, so it keeps a small
+  # ClusterRole (nodes and their metrics only) even when namespaces are set.
+  nodes: true
+
+actions:
+  # Lets people restart pods, restart and scale workloads, and run CronJobs
+  # now. Off by default; when on, the chart grants only those rights (no
+  # deletes of workloads, no Secrets, no exec), and every action is logged.
+  enabled: false
+  # Limit actions to these namespaces. Empty means every watched namespace.
+  namespaces: []
+  # The most replicas scaling may set.
+  maxReplicas: 20
+
+auth:
+  # How people sign in:
+  #   none   no sign-in. Fine with kubectl port-forward, where only people with
+  #          cluster access can reach the dashboard. Everyone may act.
+  #   proxy  an auth proxy in front (oauth2-proxy, Pomerium, an ingress's
+  #          auth-url) passes who they are in headers. Keep the dashboard
+  #          reachable only through it (networkPolicy below), or anyone could
+  #          send the headers themselves.
+  #   oidc   sign in with an OpenID Connect provider (Okta, Entra ID, Google,
+  #          Keycloak, Dex…).
+  mode: none
+  # Who may look, and who may also act. Entries: a user (email), group:<name>,
+  # *@<domain>, or *. Empty viewers: anyone signed in. Empty operators: nobody
+  # (in modes proxy and oidc).
+  viewers: []
+  operators: []
+  proxy:
+    userHeader: X-Forwarded-Email
+    groupsHeader: X-Forwarded-Groups
+  oidc:
+    issuerURL: ""
+    clientID: ""
+    # https://<your dashboard host>/auth/callback, registered with the provider.
+    redirectURL: ""
+    scopes: [openid, email, profile]
+    groupsClaim: groups
+  # A Secret in this namespace with clientSecret (oidc) and sessionKey (any
+  # long random string; keeps people signed in when the pod restarts).
+  existingSecret: ""
+
+ai:
+  # Turns on Find error, which explains why a service is broken: anthropic,
+  # or openai (also any OpenAI-compatible server, such as Ollama or vLLM, with
+  # baseURL). Empty: off; everything else works without it.
+  provider: ""
+  # Default claude-opus-5-5 for anthropic; required for openai.
+  model: ""
+  # For a local model: http://ollama.ollama:11434/v1
+  baseURL: ""
+  # A Secret in this namespace with apiKey. Not needed for a local model
+  # without a key.
+  existingSecret: ""
+  # Describe services the catalogue doesn't know from their image names
+  # (registry removed), marked "AI guess" in the dashboard.
+  describeServices: true
+
+alerts:
+  # Notify when a service stays down, degraded or has a critical problem.
+  # One notification per incident, then one when it recovers. No AI needed.
+  enabled: false
+  # A Secret in this namespace with webhookURL. Keep this URL out of values
+  # files: Slack and Teams webhook URLs contain credentials.
+  existingSecret: ""
+  # webhook (structured JSON), slack, or teams (Adaptive Card / Workflows).
+  format: webhook
+  # Ignore brief failures and normal rollouts. Checked every 15 seconds.
+  for: 5m
+  # Identifies this installation in notifications.
+  cluster: ""
+  # Optional address people can open to investigate.
+  dashboardURL: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: clusterview.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+networkPolicy:
+  # Only allow traffic into the dashboard from the ingressFrom sources (empty:
+  # any source, dashboard port only). Egress isn't restricted, because the pod
+  # must reach the Kubernetes API.
+  enabled: false
+  ingressFrom: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+      - run: go test -race ./...
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v5
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.7.0
+      - run: helm lint charts/clusterview
+      - name: Validate rendered manifests
+        run: |
+          helm template t charts/clusterview | kubeconform -strict -summary
+          helm template t charts/clusterview --set ingress.enabled=true --set networkPolicy.enabled=true | kubeconform -strict -summary
+          helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
+          helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
+      - name: Reject incomplete alert settings
+        run: |
+          if helm template t charts/clusterview --set alerts.enabled=true > /dev/null 2>&1; then
+            echo "alerts accepted without an existing Secret"
+            exit 1
+          fi
+          if helm template t charts/clusterview --set alerts.format=unknown > /dev/null 2>&1; then
+            echo "unknown alert format accepted"
+            exit 1
+          fi
+
+  # Builds every laptop binary and archive the way a release does, without
+  # publishing, so a release can't fail on something a PR could have caught.
+  binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # The release renders install.yaml into the checkout too.
+      - run: touch install.yaml
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish
+      - name: Every platform built
+        run: |
+          find dist -maxdepth 1 \( -name '*.tar.gz' -o -name '*.zip' \) | sort
+          test "$(find dist -maxdepth 1 \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l)" -eq 12
+
+  # Installs the chart on a real cluster and checks the dashboard can read it.
+  e2e:
+    needs: [go, web, chart]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/clusterview/clusterview:ci
+    steps:
+      - uses: actions/checkout@v5
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: clusterview
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: kind load docker-image "$IMAGE" --name clusterview
+      - name: Install chart
+        run: |
+          helm install clusterview charts/clusterview -n clusterview --create-namespace \
+            --set image.tag=ci --set image.pullPolicy=Never --wait --timeout 3m
+      - name: Dashboard reaches the cluster
+        run: |
+          kubectl -n clusterview port-forward svc/clusterview 8080 &
+          for _ in $(seq 1 20); do curl -sf localhost:8080/healthz && break; sleep 1; done
+          curl -sf localhost:8080/api/v1/cluster | tee cluster.json
+          jq -e '.connected == true and .mode == "in-cluster"' cluster.json
+          curl -sf localhost:8080/ | grep -q '<div id="root">'
+      - name: Changes reach the API within 2 seconds
+        run: |
+          kubectl -n default create deployment probe --image=registry.k8s.io/pause:3.10
+          sleep 3
+          curl -sN localhost:8080/api/v1/events > events.txt &
+          start=$(date +%s%3N)
+          kubectl -n default scale deployment probe --replicas=2
+          for _ in $(seq 1 40); do
+            d=$(curl -sf localhost:8080/api/v1/snapshot | jq '.workloads[] | select(.id == "Deployment/default/probe") | .desired')
+            [ "$d" = 2 ] && break
+            sleep 0.1
+          done
+          elapsed=$(( $(date +%s%3N) - start ))
+          echo "seen after ${elapsed}ms"
+          test "$d" = 2
+          test "$elapsed" -lt 2000
+          grep -q "event: version" events.txt
+      - name: Pod logs
+        run: |
+          pod=$(kubectl -n clusterview get pods -l app.kubernetes.io/name=clusterview -o jsonpath='{.items[0].metadata.name}')
+          curl -sf "localhost:8080/api/v1/namespaces/clusterview/pods/$pod/logs?tailLines=5" | tee logs.json | jq -e '.container == "clusterview" and (.lines | length) > 0'
+          curl -sf localhost:8080/api/v1/nodes | jq -e '(.nodes | length) > 0'
+      - name: Read-only access
+        run: |
+          sa=system:serviceaccount:clusterview:clusterview
+          test "$(kubectl auth can-i watch pods -A --as=$sa)" = yes
+          test "$(kubectl auth can-i get secrets -A --as=$sa)" = no
+          test "$(kubectl auth can-i delete pods -A --as=$sa)" = no
+          test "$(kubectl auth can-i create pods/exec -A --as=$sa)" = no
+      - name: Actions, once switched on
+        run: |
+          helm upgrade clusterview charts/clusterview -n clusterview --reuse-values --set actions.enabled=true --wait --timeout 3m
+          kubectl -n clusterview rollout status deploy/clusterview --timeout=2m
+          kubectl -n clusterview port-forward svc/clusterview 8081:8080 &
+          for _ in $(seq 1 20); do curl -sf localhost:8081/readyz && break; sleep 1; done
+          curl -sf localhost:8081/api/v1/actions | jq -e '.enabled == true'
+          curl -sf -X POST -H 'X-Clusterview-Action: 1' localhost:8081/api/v1/workloads/Deployment/default/probe/restart | jq -e '.ok == true'
+          kubectl -n default get deploy probe -o jsonpath='{.spec.template.metadata.annotations.clusterview\.io/restarted-by}' | grep -q anonymous
+          curl -sf localhost:8081/api/v1/audit | jq -e '.[0].target == "Deployment/default/probe"'
+          kubectl -n default get events --field-selector reason=ClusterviewAction -o name | grep -q .
+          sa=system:serviceaccount:clusterview:clusterview
+          test "$(kubectl auth can-i patch deployments -A --as=$sa)" = yes
+          test "$(kubectl auth can-i delete deployments -A --as=$sa)" = no
+          test "$(kubectl auth can-i get secrets -A --as=$sa)" = no
+          test "$(kubectl auth can-i create pods/exec -A --as=$sa)" = no
+      - name: Debug on failure
+        if: failure()
+        run: |
+          kubectl -n clusterview describe pods
+          kubectl -n clusterview logs deploy/clusterview --tail=100

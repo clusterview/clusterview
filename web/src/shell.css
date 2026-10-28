@@ -1,0 +1,229 @@
+.cv-app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+}
+
+/* Top bar */
+.cv-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--cv-surface) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--cv-border);
+  z-index: 10;
+}
+
+.cv-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cv-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 30% 30%, #fff8 0 18%, transparent 19%),
+    linear-gradient(135deg, var(--cv-accent), #22c1a4);
+  flex: none;
+}
+
+.cv-cluster {
+  font-size: 13px;
+  color: var(--cv-text-2);
+  padding-left: 10px;
+  border-left: 1px solid var(--cv-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-cluster-version {
+  color: var(--cv-text-3);
+  margin-left: 4px;
+}
+
+/* "1 service needs attention" */
+.cv-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cv-health.is-ok {
+  color: var(--cv-ok);
+  background: var(--cv-ok-soft);
+}
+
+.cv-health.is-bad {
+  color: var(--cv-bad);
+  background: var(--cv-bad-soft);
+  border-color: var(--cv-bad-line);
+  cursor: pointer;
+}
+
+.cv-health.is-bad:hover {
+  box-shadow: var(--cv-shadow-1);
+}
+
+.cv-top-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cv-signout {
+  font-size: 12.5px;
+  color: var(--cv-text-2);
+  text-decoration: none;
+}
+
+.cv-signout:hover {
+  color: var(--cv-text);
+}
+
+.cv-top-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Segmented control */
+.cv-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--cv-surface-2);
+  border: 1px solid var(--cv-border);
+}
+
+.cv-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--cv-text-2);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.cv-seg button[aria-pressed="true"] {
+  background: var(--cv-surface);
+  color: var(--cv-text);
+  box-shadow: var(--cv-shadow-1);
+}
+
+.cv-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cv-text-3);
+}
+
+.cv-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cv-idle);
+}
+
+.cv-live.is-on .cv-live-dot {
+  background: var(--cv-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv-ok) 20%, transparent);
+}
+
+.cv-user {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cv-accent);
+  background: var(--cv-accent-soft);
+}
+
+.cv-version {
+  font-family: var(--cv-mono);
+  font-size: 11px;
+  color: var(--cv-text-3);
+}
+
+/* Main area */
+.cv-main {
+  position: relative;
+  overflow: hidden;
+}
+
+.cv-empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.cv-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cv-empty-detail {
+  margin: 0;
+  color: var(--cv-text-3);
+}
+
+.cv-system-toggle {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-1);
+  font-size: 13px;
+  color: var(--cv-text-2);
+  cursor: pointer;
+}
+
+.cv-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--cv-text-2);
+  cursor: pointer;
+}
+
+.cv-icon-btn:hover {
+  background: var(--cv-surface-2);
+  border-color: var(--cv-border);
+}

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: clusterview
+description: A simple, good-looking Kubernetes dashboard. Services as boxes, what's broken and why.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/clusterview/clusterview
+sources:
+  - https://github.com/clusterview/clusterview
+keywords:
+  - kubernetes
+  - dashboard
+  - observability

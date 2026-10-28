@@ -1,0 +1,171 @@
+.cv-map {
+  position: absolute;
+  inset: 0;
+}
+
+.cv-map .react-flow__node-service {
+  cursor: pointer;
+}
+
+.cv-handle {
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+}
+
+/* Namespace container */
+.cv-group {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  border: 1px dashed var(--cv-border-strong);
+  background: color-mix(in srgb, var(--cv-surface) 45%, transparent);
+  transition: opacity var(--cv-med) var(--cv-ease);
+}
+
+.cv-group.is-dimmed {
+  opacity: 0.45;
+}
+
+.cv-group-label {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cv-group-ns {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cv-text-2);
+}
+
+.cv-group-count {
+  font-size: 12px;
+  color: var(--cv-text-3);
+}
+
+/* The way in */
+.cv-internet {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-1);
+  font-weight: 600;
+  color: var(--cv-cat-ingress);
+}
+
+.react-flow__node.is-dimmed {
+  opacity: 0.4;
+}
+
+/* Lines between services */
+.cv-edge .react-flow__edge-path {
+  stroke: var(--cv-border-strong);
+  stroke-width: 1.6;
+  transition:
+    stroke var(--cv-med) var(--cv-ease),
+    opacity var(--cv-med) var(--cv-ease);
+}
+
+.cv-edge.is-hot .react-flow__edge-path {
+  stroke: var(--cv-accent);
+  stroke-width: 2;
+}
+
+.cv-edge.is-broken .react-flow__edge-path {
+  stroke: var(--cv-bad);
+  stroke-width: 2;
+}
+
+.cv-edge.is-dimmed {
+  opacity: 0.25;
+}
+
+.cv-edge-arrow {
+  fill: var(--cv-border-strong);
+}
+
+.cv-edge.is-hot .cv-edge-arrow {
+  fill: var(--cv-accent);
+}
+
+.cv-edge.is-broken .cv-edge-arrow {
+  fill: var(--cv-bad);
+}
+
+.cv-edge.is-broken .react-flow__edge-path {
+  stroke-dasharray: 6 5;
+  animation: cv-flow 0.9s linear infinite;
+}
+
+@keyframes cv-flow {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+
+.cv-edge-label {
+  position: absolute;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--cv-text-2);
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-1);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Zoom buttons, above the "Show cluster services" toggle */
+.cv-controls {
+  margin-bottom: 64px !important;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-1);
+  background: var(--cv-surface);
+}
+
+.cv-controls .react-flow__controls-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-bottom: 1px solid var(--cv-border);
+  background: var(--cv-surface);
+  color: var(--cv-text-2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.cv-controls .react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.cv-controls .react-flow__controls-button:hover {
+  background: var(--cv-surface-2);
+}
+
+.cv-controls .react-flow__controls-button svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}

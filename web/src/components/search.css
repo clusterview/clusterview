@@ -1,0 +1,115 @@
+.cv-dialog-backdrop.is-top {
+  place-items: start center;
+  padding-top: 12vh;
+}
+
+.cv-search {
+  width: min(600px, calc(100vw - 32px));
+  border-radius: 16px;
+  background: var(--cv-surface);
+  border: 1px solid var(--cv-border);
+  box-shadow: var(--cv-shadow-3);
+  overflow: hidden;
+  animation: cv-rise var(--cv-med) var(--cv-ease);
+}
+
+.cv-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--cv-border);
+  color: var(--cv-text-3);
+}
+
+.cv-search-field input {
+  flex: 1;
+  height: 54px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--cv-text);
+  font: inherit;
+  font-size: 16px;
+}
+
+kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--cv-border);
+  background: var(--cv-surface-2);
+  font-family: var(--cv-font);
+  font-size: 11px;
+  color: var(--cv-text-3);
+}
+
+.cv-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.cv-search-results li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cv-search-results li.is-active {
+  background: var(--cv-surface-2);
+}
+
+.cv-search-results .cv-status {
+  margin: 0;
+  align-self: center;
+}
+
+.cv-hit-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.cv-hit-main span {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-search-results .cv-card-problem {
+  font-size: 12.5px;
+  flex: none;
+}
+
+.cv-search-empty {
+  justify-content: center;
+  color: var(--cv-text-3);
+  cursor: default !important;
+}
+
+/* The "Search ⌘K" button in the top bar */
+.cv-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  min-width: 200px;
+  border-radius: 9px;
+  border: 1px solid var(--cv-border);
+  background: var(--cv-surface-2);
+  color: var(--cv-text-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cv-search-btn span {
+  flex: 1;
+  text-align: left;
+}
