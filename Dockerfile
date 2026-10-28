@@ -15,10 +15,11 @@ ARG TARGETOS TARGETARCH
 ARG VERSION=dev COMMIT=unknown
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
     -ldflags "-s -w -X github.com/clusterview/clusterview/internal/version.Version=${VERSION} -X github.com/clusterview/clusterview/internal/version.Commit=${COMMIT}" \
     -o /out/clusterview ./cmd/clusterview
 
