@@ -3,8 +3,9 @@ module github.com/clusterview/clusterview
 go 1.27.3
 
 require (
+	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/go-jose/go-jose/v4 v4.1.6
 	golang.org/x/oauth2 v0.37.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.84.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
