@@ -27,6 +27,8 @@ const logLimitBytes = 2 << 20
 // LogRequest picks which log to read.
 type LogRequest struct {
 	Container string
+	// LimitBytes narrows the history budget for aggregate reads.
+	LimitBytes int64
 	// Previous reads the container's log from before its last restart.
 	Previous  bool
 	TailLines int64
@@ -82,6 +84,9 @@ func logOptions(container string, req LogRequest, follow bool) *corev1.PodLogOpt
 	}
 	if !follow {
 		limit := int64(logLimitBytes)
+		if req.LimitBytes > 0 {
+			limit = min(limit, req.LimitBytes)
+		}
 		opts.LimitBytes = &limit
 	}
 	if req.SinceTime != nil {

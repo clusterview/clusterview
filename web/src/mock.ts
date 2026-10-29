@@ -31,6 +31,18 @@ export async function mockResponse(path: string, body?: { serviceId?: string }):
       await new Promise((r) => setTimeout(r, 2200));
       return mockDiagnosis(body?.serviceId ?? "");
   }
+  if (route === "/api/v1/services/logs") {
+    const params = new URLSearchParams(path.split("?")[1]);
+    const snapshot = (mockName === "kind" ? (await import("./mock/kind.json")).default : (await import("./mock/demo.json")).default) as unknown as Snapshot;
+    const service = snapshot.services.find((s) => s.id === params.get("serviceId"));
+    const pods = snapshot.workloads.filter((w) => service?.workloads.includes(w.id)).flatMap((w) => w.pods);
+    const logs = pods.map((p) => mockLogs(p.namespace, p.name, params.get("previous") === "true"));
+    return {
+      sources: logs.map((l) => ({ namespace: l.namespace, pod: l.pod, container: l.container })),
+      containers: ["app"], totalSources: logs.length, notices: logs.flatMap((l) => l.notice ? [`${l.pod}/app: ${l.notice}`] : []),
+      lines: logs.flatMap((l) => l.lines.map((line) => ({ ...line, namespace: l.namespace, pod: l.pod, container: l.container }))).sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+    };
+  }
   const logs = route.match(/^\/api\/v1\/namespaces\/([^/]+)\/pods\/([^/]+)\/logs$/);
   if (logs) return mockLogs(logs[1], decodeURIComponent(logs[2]), path.includes("previous=true"));
   const action = route.match(/\/(restart|scale|run)$/);

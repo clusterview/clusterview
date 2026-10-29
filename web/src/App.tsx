@@ -100,7 +100,7 @@ export function App() {
             </button>
           )}
           {snapshot && (
-            <button className="cv-search-btn" onClick={() => setSearching(true)}>
+            <button aria-label="Find a service" className="cv-search-btn" onClick={() => setSearching(true)}>
               <Search size={14} />
               <span>Find a service</span>
               <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
@@ -167,6 +167,7 @@ export function App() {
             )}
             {selectedService && view !== "nodes" && (
               <ServiceDrawer
+                key={selectedService.id}
                 service={selectedService}
                 snapshot={snapshot}
                 me={me}
