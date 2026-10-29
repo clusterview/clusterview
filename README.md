@@ -28,6 +28,11 @@ Choose **All logs** in a service to combine logs across its pods and containers,
 with source labels, filters and live following. See [service logs](docs/features/service-logs.md)
 for limits and reconnect behaviour.
 
+Select a service and choose **Focus connections** to see its direct callers and
+dependencies. **Fit map** fits the current graph and **Reset view** clears the
+selection. Ingress route labels are available on demand, and the drawer shows
+the evidence for each link.
+
 ## Install
 
 ```bash

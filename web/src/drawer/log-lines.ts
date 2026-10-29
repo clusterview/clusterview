@@ -22,3 +22,8 @@ export function recentLines(lines: LogLine[]): LogLine[] {
 export function mergeLogLines(previous: LogLine[], next: LogLine[]): LogLine[] {
   return recentLines([...previous, ...next].sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? "")));
 }
+
+/** Copy exactly the filtered view, retaining full source names and timestamps. */
+export function formatLogLines(lines: LogLine[]): string {
+  return lines.map((line) => [line.timestamp, line.pod ? `[${line.namespace ? `${line.namespace}/` : ""}${line.pod}/${line.container ?? ""}]` : undefined, line.text].filter((part) => part !== undefined && part !== "").join(" ")).join("\n");
+}

@@ -28,3 +28,11 @@ test("keeps a single long line and preserves source labels", () => {
   const line = { text: "x".repeat(MAX_LOG_CHARS + 1), namespace: "shop", pod: "api-1", container: "app" };
   assert.deepEqual(mergeLogLines([], [line]), [line]);
 });
+
+test("copied logs preserve complete source names and message line breaks", async () => {
+  const { formatLogLines } = await import("../../web/src/drawer/log-lines.ts");
+  const line = { timestamp: "2026-10-29T12:00:01Z", namespace: "shop", pod: "api-very-long-replica-name", container: "worker", text: "failed\n  trace" };
+  assert.equal(formatLogLines([line]), "2026-10-29T12:00:01Z [shop/api-very-long-replica-name/worker] failed\n  trace");
+  assert.equal(formatLogLines([{ text: "plain message" }]), "plain message");
+  assert.equal(formatLogLines([]), "");
+});

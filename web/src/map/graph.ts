@@ -26,11 +26,11 @@ export const INTERNET = "internet";
 
 /** What the map shows: every service except tucked-away system ones, which
  *  still appear when something's wrong with them. */
-export function buildGraph(snap: Snapshot, showSystem: boolean): MapGraph {
+export function buildGraph(snap: Snapshot, showSystem: boolean, selectedId?: string | null): MapGraph {
   const system = new Set(
     [...new Set(snap.services.map((s) => s.namespace))].filter((ns) => isSystemNamespace(ns, snap.services)),
   );
-  const services = snap.services.filter((s) => showSystem || !system.has(s.namespace) || needsAttention(s));
+  const services = snap.services.filter((s) => showSystem || s.id === selectedId || !system.has(s.namespace) || needsAttention(s));
   const visible = new Set(services.map((s) => s.id));
   const namespaces = [...new Set(services.map((s) => s.namespace))];
 
@@ -67,6 +67,22 @@ export function buildGraph(snap: Snapshot, showSystem: boolean): MapGraph {
   for (const id of routed) if (!entry.some((x) => x.id === id)) entry.push({ id, label: "" });
 
   return { services, namespaces, edges, entry, hiddenCount: snap.services.length - services.length };
+}
+
+/** Keep only direct connections, including ingress routes. This is a display
+ * filter over discovered relationships, never an inferred transitive call. */
+export function connectedGraph(graph: MapGraph, selectedId: string): MapGraph {
+  const connected = new Set([selectedId]);
+  const edges = graph.edges.filter((edge) => edge.from === selectedId || edge.to === selectedId);
+  for (const edge of edges) connected.add(edge.from).add(edge.to);
+  const services = graph.services.filter((service) => connected.has(service.id));
+  return {
+    services,
+    namespaces: [...new Set(services.map((service) => service.namespace))],
+    edges,
+    entry: graph.entry.filter((entry) => entry.id === selectedId),
+    hiddenCount: graph.hiddenCount + graph.services.length - services.length,
+  };
 }
 
 /** A key that changes only when the shape of the map does, so status updates

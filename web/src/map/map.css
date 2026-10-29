@@ -42,8 +42,6 @@
 .cv-group-ns {
   font-size: 12px;
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--cv-text-2);
 }
 
@@ -132,40 +130,32 @@
   pointer-events: none;
 }
 
-/* Zoom buttons, above the "Show cluster services" toggle */
-.cv-controls {
-  margin-bottom: 64px !important;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--cv-border);
-  box-shadow: var(--cv-shadow-1);
-  background: var(--cv-surface);
+/* A selected service gets its own readable space beside the drawer. */
+@media (min-width: 1000px) {
+  .cv-map.has-selection { right: 564px; }
 }
 
-.cv-controls .react-flow__controls-button {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-bottom: 1px solid var(--cv-border);
-  background: var(--cv-surface);
-  color: var(--cv-text-2);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-
-.cv-controls .react-flow__controls-button:last-child {
-  border-bottom: 0;
-}
-
-.cv-controls .react-flow__controls-button:hover {
-  background: var(--cv-surface-2);
-}
-
-.cv-controls .react-flow__controls-button svg {
-  width: 12px;
-  height: 12px;
-  fill: currentColor;
-}
+.cv-service-target { border-radius: var(--cv-radius); cursor: pointer; }
+.cv-service-target:focus-visible { outline: 3px solid var(--cv-accent); outline-offset: 4px; }
+.cv-edge-label { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.cv-edge.is-dimmed .cv-edge-label { display: none; }
+.cv-map-toolbar { display: grid; gap: 10px; padding: 12px; max-width: calc(100% - 32px); border: 1px solid var(--cv-border); border-radius: 12px; background: var(--cv-surface); box-shadow: var(--cv-shadow-1); }
+.cv-map-context { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.cv-map-context strong { font-size: 13px; font-weight: 650; }
+.cv-map-context > span { color: var(--cv-text-2); font-size: 12px; }
+.cv-map-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.cv-map-actions [aria-pressed="true"] { color: var(--cv-accent); background: var(--cv-accent-soft); }
+.cv-map-focus-name { margin: 0; max-width: 290px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--cv-text-2); }
+.cv-map-navigation { margin-bottom: 64px !important; display: grid; gap: 8px; max-width: calc(100% - 32px); }
+.cv-map-zoom { display: flex; flex-wrap: wrap; align-items: center; border: 1px solid var(--cv-border); border-radius: 10px; background: var(--cv-surface); box-shadow: var(--cv-shadow-1); width: fit-content; overflow: hidden; }
+.cv-map-zoom button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; min-width: 34px; height: 34px; border: 0; background: none; cursor: pointer; font-size: 12px; }
+.cv-map-zoom button:hover:not(:disabled) { background: var(--cv-surface-2); }
+.cv-map-zoom button:disabled { opacity: .4; cursor: not-allowed; }
+.cv-map-zoom button:focus-visible { outline-offset: -3px; }
+.cv-map-zoom > span { width: 42px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--cv-text-2); }
+.cv-map-legend { margin: 0; font-size: 12px; color: var(--cv-text-2); background: var(--cv-surface); border-radius: 6px; padding: 4px 8px; width: fit-content; }
+.cv-map-legend > span { color: var(--cv-accent); font-size: 15px; margin-right: 4px; }
+.cv-map-message { position: absolute; inset: 45% auto auto 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 10px; background: var(--cv-surface); box-shadow: var(--cv-shadow-2); }
+.cv-map.is-focused .cv-card { width: 224px; }
+.cv-map.is-focused .cv-card-sub .cv-mono,
+.cv-map.is-focused .cv-card-sub .cv-mono + .cv-dot-sep { display: none; }

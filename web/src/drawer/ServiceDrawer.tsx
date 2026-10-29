@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Globe, ScrollText, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Maximize2, Minimize2, ScrollText, X } from "lucide-react";
 import type { ActionsConfig, AIInfo, Me, PodState, Problem, Service, Snapshot, Workload } from "../api";
 import { CategoryIcon, categoryLabel } from "../components/CategoryIcon";
 import { PodPips, toneOf } from "../components/ServiceCard";
@@ -8,6 +8,7 @@ import { age } from "../format";
 import { describeSchedule } from "../format-cron";
 import { FindError } from "./FindError";
 import { LogsTab } from "./LogsTab";
+import { Connections } from "./Connections";
 import { ServiceActions, PodRestartButton, canActIn } from "./actions";
 import "./drawer.css";
 
@@ -33,6 +34,7 @@ const sourceNote: Record<string, string> = {
 export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, onSelect }: Props) {
   const [tab, setTab] = useState<Tab>(() => (new URLSearchParams(window.location.search).get("tab") as Tab) || "overview");
   const [logsPod, setLogsPod] = useState<string | null>(null);
+  const [wide, setWide] = useState(false);
 
   const workloads = useMemo(() => {
     const byId = new Map(snapshot.workloads.map((w) => [w.id, w]));
@@ -45,22 +47,13 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
   const tone = toneOf(s);
   const canAct = canActIn(me, actions, s.namespace);
 
-  // A new service opens on its overview.
-  const [shownId, setShownId] = useState(s.id);
-  useEffect(() => {
-    if (s.id === shownId) return;
-    setShownId(s.id);
-    setTab("overview");
-    setLogsPod(null);
-  }, [s.id, shownId]);
-
   const openLogs = (pod: string) => {
     setLogsPod(pod);
     setTab("logs");
   };
 
   return (
-    <aside className="cv-drawer" aria-label={`${s.title} details`}>
+    <aside className={`cv-drawer${wide ? " is-wide" : ""}`} aria-label={`${s.title} details`}>
       <header className="cv-drawer-head">
         <CategoryIcon category={s.category} size={44} />
         <div className="cv-drawer-titles">
@@ -73,6 +66,9 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
             {s.managedBy ? `${s.managedBy.kind} (operator)` : (workloads[0]?.kind ?? "")}
           </p>
         </div>
+        <button className="cv-icon-btn cv-drawer-expand" onClick={() => setWide(!wide)} aria-label={wide ? "Restore details width" : "Expand details"} title={wide ? "Restore width" : "Expand for more room"}>
+          {wide ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
         <button className="cv-icon-btn" onClick={onClose} aria-label="Close">
           <X size={18} />
         </button>
@@ -100,7 +96,7 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
         onChange={setTab}
       />
 
-      <div className="cv-drawer-body">
+      <div className={`cv-drawer-body${tab === "logs" ? " has-logs" : ""}`}>
         {tab === "overview" && (
           <>
             {s.problems.length > 0 && (
@@ -173,7 +169,7 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
           </>
         )}
 
-        {tab === "logs" && <LogsTab key={s.id} serviceId={s.id} pods={pods} initialPod={logsPod} />}
+        {tab === "logs" && <LogsTab key={`${s.id}:${logsPod ?? "all"}`} serviceId={s.id} pods={pods} initialPod={logsPod} />}
 
         {tab === "events" &&
           (events.length === 0 ? (
@@ -219,76 +215,21 @@ function ProblemCard({ problem: p, onLogs }: { problem: Problem; onLogs: (pod: s
 }
 
 function PodRow({ pod: p, onLogs, action }: { pod: PodState; onLogs: () => void; action: React.ReactNode }) {
-  const state = p.ready ? "is-ready" : p.stuck ? "is-stuck" : "is-starting";
-  return (
-    <li className="cv-pod">
-      <span className={`cv-pip ${state}`} />
-      <div className="cv-pod-main">
-        <span className="cv-mono cv-pod-name">{p.name}</span>
-        <span className="cv-pod-meta">
-          {p.reason ?? (p.ready ? "Running" : p.phase)}
-          {p.restarts > 0 && ` · ${p.restarts} restart${p.restarts === 1 ? "" : "s"}`}
-          {p.startedAt && ` · ${age(p.startedAt)}`}
-          {p.node && ` · ${p.node}`}
-        </span>
+  return <li className="cv-pod">
+    <div className="cv-pod-main">
+      <span className="cv-mono cv-pod-name" title={`${p.namespace}/${p.name}${p.node ? ` · Node: ${p.node}` : ""}`}>{p.name}</span>
+      <div className="cv-pod-meta">
+        <span className={`cv-pod-state${p.ready ? " is-ready" : p.stuck ? " is-stuck" : ""}`}><span aria-hidden="true" />{p.reason ?? (p.ready ? "Running" : p.phase)}</span>
+        <span>{p.readyContainers} ready</span>
+        <span className={p.restarts > 0 ? "cv-warn-text" : undefined}>{p.restarts} restart{p.restarts === 1 ? "" : "s"}</span>
+        {p.startedAt && <span>{age(p.startedAt)} old</span>}
       </div>
-      <button className="cv-btn is-ghost is-sm" onClick={onLogs}>
-        Logs
-      </button>
+    </div>
+    <div className="cv-pod-actions">
+      <button className="cv-btn is-secondary is-sm" onClick={onLogs} aria-label={`Logs for ${p.name}`}>Logs</button>
       {action}
-    </li>
-  );
-}
-
-function Connections({ service: s, snapshot, onSelect }: { service: Service; snapshot: Snapshot; onSelect: (id: string) => void }) {
-  const byId = new Map(snapshot.services.map((x) => [x.id, x]));
-  const out = snapshot.links.filter((l) => l.from === s.id).map((l) => ({ l, svc: byId.get(l.to) }));
-  const into = snapshot.links.filter((l) => l.to === s.id).map((l) => ({ l, svc: byId.get(l.from) }));
-  if (!out.length && !into.length && !s.entrypoints.length) return null;
-  const chip = (svc: Service | undefined, title: string) =>
-    svc && (
-      <button key={svc.id} className="cv-conn" onClick={() => onSelect(svc.id)} title={title}>
-        <CategoryIcon category={svc.category} size={22} />
-        {svc.title}
-        <span className={`cv-status is-${toneOf(svc)}`} />
-      </button>
-    );
-  return (
-    <section className="cv-section">
-      <h3>Connections</h3>
-      {s.entrypoints.length > 0 && (
-        <div className="cv-conn-row">
-          <span className="cv-conn-label">
-            <Globe size={14} /> From outside
-          </span>
-          <div className="cv-conn-list">
-            {s.entrypoints.map((e, i) => (
-              <span key={i} className="cv-host cv-mono">
-                {e.tls ? "https" : "http"}://{e.host ?? "*"}
-                {e.path ?? ""}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {out.length > 0 && (
-        <div className="cv-conn-row">
-          <span className="cv-conn-label">
-            <ArrowUpRight size={14} /> Calls
-          </span>
-          <div className="cv-conn-list">{out.map(({ l, svc }) => chip(svc, `${l.via}, found in ${l.evidence}`))}</div>
-        </div>
-      )}
-      {into.length > 0 && (
-        <div className="cv-conn-row">
-          <span className="cv-conn-label">
-            <ArrowDownLeft size={14} /> Called by
-          </span>
-          <div className="cv-conn-list">{into.map(({ l, svc }) => chip(svc, `${l.via}, found in ${l.evidence}`))}</div>
-        </div>
-      )}
-    </section>
-  );
+    </div>
+  </li>;
 }
 
 function WorkloadDetails({ w }: { w: Workload }) {

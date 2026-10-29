@@ -85,6 +85,7 @@
 }
 
 .cv-signout {
+  white-space: nowrap;
   font-size: 12.5px;
   color: var(--cv-text-2);
   text-decoration: none;
@@ -226,4 +227,24 @@
 .cv-icon-btn:hover {
   background: var(--cv-surface-2);
   border-color: var(--cv-border);
+}
+
+@media (max-width: 1100px) {
+  .cv-top { flex-wrap: wrap; gap: 10px; }
+  .cv-top-center { order: 3; flex-basis: 100%; }
+  .cv-search-btn { flex: 1; }
+  .cv-cluster-version { display: none; }
+  .cv-top-right { flex: none; }
+}
+@media (max-width: 600px) {
+  .cv-app { height: 100dvh; }
+  .cv-top { padding: 10px 12px; }
+  .cv-brand { flex-basis: 100%; }
+  .cv-top-right { flex-basis: 100%; justify-content: space-between; gap: 6px; }
+  .cv-seg button { padding-inline: 7px; }
+  .cv-top-center { gap: 8px; }
+  .cv-health { font-size: 12px; padding: 6px 8px; }
+  .cv-search-btn { justify-content: center; min-width: 36px; }
+  .cv-search-btn span, .cv-search-btn kbd { display: none; }
+  .cv-version { display: none; }
 }

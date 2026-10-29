@@ -16,6 +16,12 @@ messages, including ones with equal timestamps, remain separate lines.
 highlights likely failures using the same text matching as individual pod logs.
 **Before last restart** reads each selected container's previous instance and
 pauses following; Kubernetes may have no previous log for some containers.
+The status row distinguishes following, history, reconnecting, ended and
+unavailable streams. **Reload logs** opens fresh requests and streams.
+**Wrap log lines** switches between wrapped text and horizontal scrolling.
+**Copy visible logs** copies the filtered lines with full source names and
+timestamps. Scrolling up pauses auto-scroll; **Jump to latest** resumes it.
+Use **Expand details** in the drawer header for more room.
 Unavailable logs produce a notice naming the source while other sources remain
 visible. These are container logs from Kubernetes, not an archive of deleted pods.
 
@@ -29,7 +35,7 @@ visible. These are container logs from Kubernetes, not an archive of deleted pod
   and a 15-second timeout. The merged response keeps at most 5,000 lines.
 - The browser reconnects when its connection drops, replacing its displayed
   history with a fresh tail. If an individual container stream fails, its notice
-  identifies the source; toggle **Follow** off and on to open fresh streams.
+  identifies the source; choose **Reload logs** to open fresh streams.
 - Ordering uses Kubernetes timestamps. Clock differences between nodes can affect
   their apparent order, and late lines may move into their timestamp position.
 

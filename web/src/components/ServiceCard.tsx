@@ -35,12 +35,13 @@ interface Props {
   service: Service;
   workloads: Workload[];
   selected?: boolean;
+  showNamespace?: boolean;
   dimmed?: boolean;
   /** Set when a service this one calls is broken. */
   dependsOnBroken?: string;
 }
 
-export function ServiceCard({ service: s, workloads, selected, dimmed, dependsOnBroken }: Props) {
+export function ServiceCard({ service: s, workloads, selected, showNamespace, dimmed, dependsOnBroken }: Props) {
   const tone = toneOf(s);
   const pods = workloads.filter((w) => w.kind !== "Job" && w.kind !== "CronJob").flatMap((w) => w.pods);
   const problem = s.problems[0];
@@ -67,8 +68,9 @@ export function ServiceCard({ service: s, workloads, selected, dimmed, dependsOn
       <header className="cv-card-head">
         <CategoryIcon category={s.category} />
         <div className="cv-card-titles">
-          <h3 className="cv-card-title">{s.title}</h3>
-          <p className="cv-card-sub">
+          <h3 className="cv-card-title" title={s.title}>{s.title}</h3>
+          <p className="cv-card-sub" title={`${s.namespace}/${s.name} · ${s.managedBy?.kind ?? workloads[0]?.kind ?? ""}`}>
+            {showNamespace && <><span>{s.namespace}</span><span className="cv-dot-sep" /></>}
             {showName && <span className="cv-mono">{s.name}</span>}
             {showName && <span className="cv-dot-sep" />}
             <span>{s.managedBy ? s.managedBy.kind : (workloads[0]?.kind ?? "")}</span>
@@ -76,7 +78,7 @@ export function ServiceCard({ service: s, workloads, selected, dimmed, dependsOn
         </div>
         <span className={`cv-status is-${tone}`} aria-hidden />
       </header>
-      <footer className="cv-card-foot">
+      <footer className="cv-card-foot" title={problem?.detail ?? dependsOnBroken ?? s.description}>
         {s.desired > 0 && !schedule && (
           <span className="cv-replicas">
             <PodPips pods={pods} desired={s.desired} />
