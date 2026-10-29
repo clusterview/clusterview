@@ -199,7 +199,7 @@ jobs:
               "docker-go-mod": "/go/pkg/mod"
             }
           skip-extraction: ${{ steps.docker-go-cache.outputs.cache-hit }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           load: true
