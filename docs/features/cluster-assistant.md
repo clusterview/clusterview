@@ -12,7 +12,13 @@ the workspace. Closing it preserves the conversation until the page reloads;
 Use the existing `ai.provider`, `ai.model`, `ai.existingSecret` and optional
 `ai.baseURL` chart settings. There is one provider, key and model: the same
 model screens input and investigates. No second classifier is configured.
-AI is off when no provider is set. The unconfigured sidebar links to setup.
+AI is off when no provider is set. A cloud provider without an API key also
+leaves AI off: the dashboard starts normally, logs a setup warning, and the
+sidebar shows **Connect your AI provider** without a chat input. A missing AI
+Secret or `apiKey` field behaves the same way; login credentials remain required.
+Keyless custom OpenAI-compatible endpoints continue to work. Other invalid AI
+settings, such as an unknown provider or a missing model when a key is supplied,
+still report a configuration error. The unconfigured sidebar links to setup.
 
 - `anthropic`: existing Anthropic integration; the existing default model
   applies if `ai.model` is omitted.

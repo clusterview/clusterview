@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -141,5 +142,19 @@ func TestOfficialOpenAICompletionBudget(t *testing.T) {
 	})
 	if _, err := m.JSON(t.Context(), Request{MaxTokens: 1024, Schema: map[string]any{"type": "object"}}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMissingKeyIsDistinctFromOtherConfigurationErrors(t *testing.T) {
+	for _, provider := range []string{ProviderAnthropic, ProviderOpenAI, ProviderGemini} {
+		model, err := New(Config{Provider: provider})
+		if model != nil || !errors.Is(err, ErrMissingKey) {
+			t.Errorf("%s: expected missing-key error, got %v", provider, err)
+		}
+	}
+	for _, cfg := range []Config{{Provider: "unknown"}, {Provider: ProviderOpenAI, APIKey: "test-key"}, {Provider: ProviderGemini, APIKey: "test-key"}} {
+		if _, err := New(cfg); err == nil || errors.Is(err, ErrMissingKey) {
+			t.Errorf("other configuration error classified as missing key: %v", err)
+		}
 	}
 }

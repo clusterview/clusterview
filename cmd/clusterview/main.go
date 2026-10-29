@@ -148,7 +148,7 @@ func run(cfg config, log *slog.Logger) error {
 		log.Warn("actions are on without sign-in: anyone who can reach the dashboard can use them")
 	}
 
-	model, err := ai.New(cfg.ai)
+	model, err := optionalModel(cfg.ai, log)
 	if err != nil {
 		return fmt.Errorf("AI setup: %w", err)
 	}
@@ -313,4 +313,14 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// optionalModel keeps the dashboard available while cloud AI credentials are absent.
+func optionalModel(cfg ai.Config, log *slog.Logger) (ai.Model, error) {
+	model, err := ai.New(cfg)
+	if errors.Is(err, ai.ErrMissingKey) {
+		log.Warn("AI disabled: provider API key is missing; configure it to enable the assistant and Find error", "provider", cfg.Provider)
+		return nil, nil
+	}
+	return model, err
 }
