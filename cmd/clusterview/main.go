@@ -67,7 +67,7 @@ func main() {
 	actionNamespaces := flag.String("actions-namespaces", os.Getenv("CLUSTERVIEW_ACTIONS_NAMESPACES"), "comma-separated namespaces actions may touch (default: those watched)")
 	flag.IntVar(&cfg.actions.MaxReplicas, "actions-max-replicas", envInt("CLUSTERVIEW_ACTIONS_MAX_REPLICAS", 20), "the most replicas scaling may set")
 
-	authMode := flag.String("auth", envOr("CLUSTERVIEW_AUTH", "none"), "how people sign in: none, proxy or oidc")
+	authMode := flag.String("auth", envOr("CLUSTERVIEW_AUTH", "none"), "how people sign in: none, proxy, oidc or password")
 	viewers := flag.String("auth-viewers", os.Getenv("CLUSTERVIEW_AUTH_VIEWERS"), "who may look: users, group:<name>, *@<domain>; empty means anyone signed in")
 	operators := flag.String("auth-operators", os.Getenv("CLUSTERVIEW_AUTH_OPERATORS"), "who may also act; empty means nobody unless --auth=none")
 	flag.StringVar(&cfg.auth.UserHeader, "auth-user-header", os.Getenv("CLUSTERVIEW_AUTH_USER_HEADER"), "proxy mode: header with the user (default X-Forwarded-Email)")
@@ -111,6 +111,7 @@ func main() {
 	// Secrets come from the environment only, never flags (which ps shows).
 	cfg.auth.ClientSecret = os.Getenv("CLUSTERVIEW_OIDC_CLIENT_SECRET")
 	cfg.auth.SessionKey = []byte(os.Getenv("CLUSTERVIEW_SESSION_KEY"))
+	cfg.auth.Password = os.Getenv("CLUSTERVIEW_AUTH_PASSWORD")
 	cfg.ai.APIKey = aiKey(cfg.ai.Provider)
 	bp, err := cleanBasePath(*basePath)
 	if err != nil {

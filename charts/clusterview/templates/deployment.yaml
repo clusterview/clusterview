@@ -77,6 +77,11 @@ spec:
             - name: CLUSTERVIEW_OIDC_GROUPS_CLAIM
               value: {{ .Values.auth.oidc.groupsClaim | quote }}
             {{- end }}
+            {{- if eq .Values.auth.mode "password" }}
+            - name: CLUSTERVIEW_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ required "auth.existingSecret (with a password key) is required in password mode" .Values.auth.existingSecret | quote }}, key: password}
+            {{- end }}
             {{- with .Values.auth.existingSecret }}
             - name: CLUSTERVIEW_OIDC_CLIENT_SECRET
               valueFrom:

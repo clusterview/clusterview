@@ -94,20 +94,24 @@ func (s sessions) sign(payload string) string {
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }
 
-// Routes adds the sign-in routes for OIDC mode.
+// Routes adds the sign-in routes for OIDC and password modes.
 func (a *Authenticator) Routes(mux *http.ServeMux) {
-	if a.cfg.Mode != ModeOIDC {
-		return
+	switch a.cfg.Mode {
+	case ModeOIDC:
+		mux.HandleFunc("GET /auth/login", a.login)
+		mux.HandleFunc("GET /auth/callback", a.callback)
+		mux.HandleFunc("GET /auth/logout", a.logout)
+		mux.HandleFunc("GET /auth/signed-out", signedOut)
+	case ModePassword:
+		a.passwordRoutes(mux)
 	}
-	mux.HandleFunc("GET /auth/login", a.login)
-	mux.HandleFunc("GET /auth/callback", a.callback)
-	mux.HandleFunc("GET /auth/logout", a.logout)
-	mux.HandleFunc("GET /auth/signed-out", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>Signed out</title>` +
-			`<body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh">` +
-			`<p>You're signed out of clusterview. <a href="login">Sign in again</a></p>`))
-	})
+}
+
+func signedOut(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>Signed out</title>` +
+		`<body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh">` +
+		`<p>You're signed out of clusterview. <a href="login">Sign in again</a></p>`))
 }
 
 func (a *Authenticator) login(w http.ResponseWriter, r *http.Request) {

@@ -282,7 +282,7 @@ export interface Me {
   name: string;
   groups: string[];
   role: "" | "viewer" | "operator";
-  mode: "none" | "proxy" | "oidc";
+  mode: "none" | "proxy" | "oidc" | "password";
 }
 
 export const getMe = () => getJSON<Me>("api/v1/me");

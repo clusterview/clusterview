@@ -48,6 +48,9 @@ auth:
   #          send the headers themselves.
   #   oidc   sign in with an OpenID Connect provider (Okta, Entra ID, Google,
   #          Keycloak, Dex…).
+  #   password  one shared password from auth.existingSecret (key password),
+  #          like Grafana's built-in login. Nobody is told apart, so keep
+  #          actions off or limit operators.
   mode: none
   # Who may look, and who may also act. Entries: a user (email), group:<name>,
   # *@<domain>, or *. Empty viewers: anyone signed in. Empty operators: nobody
@@ -64,8 +67,9 @@ auth:
     redirectURL: ""
     scopes: [openid, email, profile]
     groupsClaim: groups
-  # A Secret in this namespace with clientSecret (oidc) and sessionKey (any
-  # long random string; keeps people signed in when the pod restarts).
+  # A Secret in this namespace with clientSecret (oidc) or password (password
+  # mode, at least 12 characters), and sessionKey (any long random string;
+  # keeps people signed in when the pod restarts).
   existingSecret: ""
 
 ai:

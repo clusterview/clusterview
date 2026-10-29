@@ -107,6 +107,7 @@ jobs:
           helm template t charts/clusterview | kubeconform -strict -summary
           helm template t charts/clusterview --set ingress.enabled=true --set networkPolicy.enabled=true | kubeconform -strict -summary
           helm template t charts/clusterview --set ingress.enabled=true --set basePath=/clusterview | kubeconform -strict -summary
+          helm template t charts/clusterview --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
       - name: Reject incomplete alert settings

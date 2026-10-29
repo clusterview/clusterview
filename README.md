@@ -131,6 +131,7 @@ browser won't send cross-site.
 | `none` (default) | Nobody; everyone may act (if actions are on) | You reach it with `kubectl port-forward`, so only people with cluster access can |
 | `proxy` | Whoever an auth proxy says, from `X-Forwarded-Email` and `X-Forwarded-Groups` | oauth2-proxy, Pomerium, or an ingress `auth-url` sits in front. Keep the dashboard reachable only through the proxy (`networkPolicy`), or anyone could send those headers |
 | `oidc` | People who sign in with your OpenID Connect provider (Okta, Entra ID, Google, Keycloak, Dex…) | You expose it with an ingress |
+| `password` | Anyone with the one shared password, like Grafana's built-in login | You expose it to a small team and want no identity provider. Nobody is told apart, so keep actions off |
 
 `auth.viewers` may look and `auth.operators` may also act. Entries are a user
 (`ann@example.com`), `group:<name>`, `*@<domain>` or `*`. An empty viewers
@@ -150,6 +151,17 @@ helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n cluster
   --set auth.existingSecret=clusterview-auth \
   --set 'auth.viewers={*@example.com}' --set 'auth.operators={group:platform}'
 ```
+
+Password example (a password of at least 12 characters):
+
+```bash
+kubectl -n clusterview create secret generic clusterview-auth \
+  --from-literal=password="$(openssl rand -base64 24)" --from-literal=sessionKey="$(openssl rand -hex 32)"
+helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview --reuse-values \
+  --set auth.mode=password --set auth.existingSecret=clusterview-auth
+```
+
+A wrong password waits a second before answering, to slow guessing.
 
 Sign-in uses the authorization code flow with PKCE, state and nonce. The
 session is a signed, HttpOnly, SameSite=Lax cookie (Secure over https) that
