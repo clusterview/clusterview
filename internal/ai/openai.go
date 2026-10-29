@@ -19,6 +19,7 @@ type openAIModel struct {
 	baseURL string
 	apiKey  string
 	model   string
+	label   string
 }
 
 func newOpenAI(cfg Config) *openAIModel {
@@ -33,6 +34,9 @@ func newOpenAI(cfg Config) *openAIModel {
 }
 
 func (m *openAIModel) Name() string {
+	if m.label != "" {
+		return m.label
+	}
 	if strings.HasPrefix(m.baseURL, "https://api.openai.com") {
 		return "OpenAI · " + m.model
 	}
@@ -59,6 +63,13 @@ func (m *openAIModel) JSON(ctx context.Context, req Request) ([]byte, error) {
 				"strict": true,
 			},
 		},
+	}
+	if req.MaxTokens > 0 {
+		if strings.HasPrefix(m.baseURL, "https://api.openai.com/") {
+			body["max_completion_tokens"] = req.MaxTokens
+		} else {
+			body["max_tokens"] = req.MaxTokens
+		}
 	}
 	text, status, err := m.send(ctx, body)
 	// Older local servers don't know json_schema; plain JSON mode still works,

@@ -178,6 +178,11 @@ lasts 12 hours. Without a `sessionKey`, a restart signs everyone out.
 
 ### Find error (AI)
 
+The same provider also powers the **Cluster assistant** sidebar: chat about
+cluster health, inspect targeted evidence and copy a handoff for a coding agent.
+It uses one model for scope checks and investigation. See [setup, limits and data
+handling](docs/features/cluster-assistant.md).
+
 Off until you bring a key. Then a broken service's drawer gets a **Find
 error** button: clusterview gathers what Kubernetes knows about it (its
 problems, pod and container states, a summary of the pod spec, recent
@@ -194,13 +199,15 @@ helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n cluster
 | `ai.provider` | Model | Key |
 |---|---|---|
 | `anthropic` | `claude-opus-5-5` unless `ai.model` says otherwise | `apiKey` in `ai.existingSecret` |
+| `gemini` | `ai.model`, required | `apiKey` in `ai.existingSecret` |
 | `openai` | `ai.model`, required | `apiKey` in `ai.existingSecret` |
 | `openai` with `ai.baseURL` | Any OpenAI-compatible server: Ollama, vLLM, LM Studio (`http://ollama.ollama:11434/v1`) | Usually none |
 
 On a laptop: `kubectl clusterview --ai-provider=anthropic` reads
-`ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` for openai).
+`ANTHROPIC_API_KEY` (`OPENAI_API_KEY` for openai, `GEMINI_API_KEY` for gemini).
+`CLUSTERVIEW_AI_API_KEY` overrides these for any provider.
 
-What leaves the cluster, and only when someone presses the button:
+For **Find error**, what leaves the cluster when someone presses the button:
 
 - Never Secret values: variables from Secrets show only the Secret's name,
   and variables with secret-sounding names (`*PASSWORD*`, `*TOKEN*`,
@@ -294,7 +301,9 @@ You need Go (see `go.mod`), Node 24, Docker, Helm and kind.
 | `POST /api/v1/workloads/CronJob/{ns}/{name}/run` | Run a CronJob now (actions on) |
 | `GET /api/v1/actions`, `/api/v1/audit` | Action limits; the audit log |
 | `GET /api/v1/me` | Who you are and your role |
-| `GET /api/v1/ai` | Whether Find error is on, and with which model |
+| `GET /api/v1/ai` | AI availability, model and `chat` availability |
+| `POST /api/v1/assistant` | Read-only cluster chat; message, optional session and selection (AI on) |
+| `DELETE /api/v1/assistant/{session}` | Forget the caller’s idle conversation |
 | `POST /api/v1/diagnose` | Find error, body `{"serviceId": "...", "fresh": false}` (AI on) |
 | `GET /auth/login`, `/auth/callback`, `/auth/logout` | OIDC sign-in (mode `oidc`) |
 | `GET /api/v1/cluster`, `/api/v1/version` | Connection status and build info |
@@ -388,6 +397,7 @@ internal/api/         HTTP API, event streams and UI serving
 internal/cluster/     watches, workloads and health, nodes, logs
 internal/ai/          model providers, secret redaction, AI descriptions
 internal/alerts/      sustained-failure alerts, recovery and webhook delivery
+internal/assistant/   read-only cluster chat, scope checks, evidence tools and sessions
 internal/diagnose/    Find error: gathers the evidence and asks the model
 internal/kube/        cluster connection
 web/                  React + Vite UI, embedded into the binary

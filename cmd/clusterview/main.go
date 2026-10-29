@@ -28,6 +28,7 @@ import (
 	"github.com/clusterview/clusterview/internal/ai"
 	"github.com/clusterview/clusterview/internal/alerts"
 	"github.com/clusterview/clusterview/internal/api"
+	"github.com/clusterview/clusterview/internal/assistant"
 	"github.com/clusterview/clusterview/internal/auth"
 	"github.com/clusterview/clusterview/internal/cluster"
 	"github.com/clusterview/clusterview/internal/diagnose"
@@ -79,8 +80,8 @@ func main() {
 	flag.StringVar(&cfg.auth.GroupsClaim, "oidc-groups-claim", os.Getenv("CLUSTERVIEW_OIDC_GROUPS_CLAIM"), "oidc mode: claim with the user's groups (default groups)")
 
 	basePath := flag.String("base-path", os.Getenv("CLUSTERVIEW_BASE_PATH"), "serve the dashboard under this path, such as /clusterview, when it shares a host with other apps")
-	flag.StringVar(&cfg.ai.Provider, "ai-provider", os.Getenv("CLUSTERVIEW_AI_PROVIDER"), "turns on Find error: anthropic, or openai (also for local OpenAI-compatible servers)")
-	flag.StringVar(&cfg.ai.Model, "ai-model", os.Getenv("CLUSTERVIEW_AI_MODEL"), "model to ask (default "+ai.DefaultAnthropicModel+" for anthropic; required for openai)")
+	flag.StringVar(&cfg.ai.Provider, "ai-provider", os.Getenv("CLUSTERVIEW_AI_PROVIDER"), "turns on cluster chat and Find error: anthropic, gemini, or openai (also for local OpenAI-compatible servers)")
+	flag.StringVar(&cfg.ai.Model, "ai-model", os.Getenv("CLUSTERVIEW_AI_MODEL"), "model to ask (default "+ai.DefaultAnthropicModel+" for anthropic; required for openai and gemini)")
 	flag.StringVar(&cfg.ai.BaseURL, "ai-base-url", os.Getenv("CLUSTERVIEW_AI_BASE_URL"), "another server for the openai provider, such as http://localhost:11434/v1 for Ollama")
 	flag.BoolVar(&cfg.ai.Describe, "ai-describe", envOr("CLUSTERVIEW_AI_DESCRIBE", "true") == "true", "describe services the catalogue doesn't know, from their image names, marked as AI guesses")
 	alertFor := flag.String("alerts-for", envOr("CLUSTERVIEW_ALERTS_FOR", "5m"), "how long a service must stay broken before notifying the alert webhook")
@@ -191,6 +192,7 @@ func run(cfg config, log *slog.Logger) error {
 	server.SetBasePath(cfg.basePath)
 	if model != nil && c != nil {
 		server.SetAI(diagnose.New(model, c), api.AIInfo{Enabled: true, Model: model.Name(), Describe: cfg.ai.Describe})
+		server.SetAssistant(assistant.New(model, c))
 		log.Info("AI", "model", model.Name(), "describe", cfg.ai.Describe)
 	}
 	srv := &http.Server{
@@ -281,6 +283,8 @@ func aiKey(provider string) string {
 	switch strings.ToLower(provider) {
 	case ai.ProviderAnthropic:
 		return os.Getenv("ANTHROPIC_API_KEY")
+	case ai.ProviderGemini:
+		return os.Getenv("GEMINI_API_KEY")
 	case ai.ProviderOpenAI:
 		return os.Getenv("OPENAI_API_KEY")
 	}

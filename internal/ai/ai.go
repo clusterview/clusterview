@@ -1,5 +1,5 @@
 // Package ai talks to the model people bring their own key for: Anthropic,
-// OpenAI, or anything that speaks OpenAI's chat API (Ollama, vLLM, LM Studio).
+// OpenAI, Gemini, or anything that speaks OpenAI's chat API (Ollama, vLLM, LM Studio).
 // Everything else in clusterview works without it.
 package ai
 
@@ -13,6 +13,7 @@ import (
 // Providers.
 const (
 	ProviderAnthropic = "anthropic"
+	ProviderGemini    = "gemini"
 	// ProviderOpenAI is OpenAI, or with a base URL any server that speaks its
 	// chat completions API, such as a local model.
 	ProviderOpenAI = "openai"
@@ -67,6 +68,16 @@ func New(cfg Config) (Model, error) {
 			return nil, errors.New("ai.provider is anthropic but no API key is set (CLUSTERVIEW_AI_API_KEY or ANTHROPIC_API_KEY)")
 		}
 		return newAnthropic(cfg), nil
+	case ProviderGemini:
+		if cfg.APIKey == "" || cfg.Model == "" {
+			return nil, errors.New("ai.provider is gemini: set ai.model and an API key (CLUSTERVIEW_AI_API_KEY or GEMINI_API_KEY)")
+		}
+		if cfg.BaseURL == "" {
+			cfg.BaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
+		}
+		m := newOpenAI(cfg)
+		m.label = "Gemini · " + cfg.Model
+		return m, nil
 	case ProviderOpenAI:
 		if cfg.Model == "" {
 			return nil, errors.New("ai.provider is openai: name a model with ai.model (--ai-model)")
@@ -76,7 +87,7 @@ func New(cfg Config) (Model, error) {
 		}
 		return newOpenAI(cfg), nil
 	}
-	return nil, fmt.Errorf("unknown ai.provider %q: use anthropic or openai", cfg.Provider)
+	return nil, fmt.Errorf("unknown ai.provider %q: use anthropic, openai or gemini", cfg.Provider)
 }
 
 // extractJSON returns the outermost JSON object in text. Local models

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, LayoutGrid, List, Monitor, Moon, Search, Server, Sun } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, LayoutGrid, List, Monitor, Moon, MessageSquareText, Search, Server, Sun } from "lucide-react";
 import {
   getActionsConfig,
   getAI,
@@ -21,6 +21,7 @@ import { ListView } from "./views/ListView";
 import { NodesView } from "./views/NodesView";
 import { ServiceDrawer } from "./drawer/ServiceDrawer";
 import { SearchPalette } from "./components/SearchPalette";
+import { AssistantPanel } from "./assistant/AssistantPanel";
 import "./shell.css";
 
 type View = "map" | "list" | "nodes";
@@ -34,11 +35,19 @@ export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [actions, setActions] = useState<ActionsConfig | null>(null);
   const [ai, setAI] = useState<AIInfo | null>(null);
-  const [view, setView] = useState<View>(() => (["list", "nodes"].includes(params.get("view") ?? "") ? (params.get("view") as View) : "map"));
+  const [view, setView] = useState<View>(() =>
+    ["list", "nodes"].includes(params.get("view") ?? "") ? (params.get("view") as View) : "map",
+  );
   // ?select=<service id> opens a service; handy for links and screenshots.
   const [selected, setSelected] = useState<string | null>(() => params.get("select"));
   const [showSystem, setShowSystem] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [chatOpen, setChatOpen] = useState(params.get("assistant") === "open");
+  const assistantToggle = useRef<HTMLButtonElement>(null);
+  const closeAssistant = () => {
+    setChatOpen(false);
+    assistantToggle.current?.focus();
+  };
   const { data: snapshot, live } = useLive(getSnapshot);
   const { theme, next: nextTheme } = useTheme();
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
@@ -122,6 +131,15 @@ export function App() {
               </button>
             ))}
           </nav>
+          <button
+            ref={assistantToggle}
+            className="cv-btn is-secondary is-sm cv-assistant-toggle"
+            aria-expanded={chatOpen}
+            aria-controls="cluster-assistant"
+            onClick={() => setChatOpen(!chatOpen)}
+          >
+            <MessageSquareText size={14} /> Assistant
+          </button>
           <span className={`cv-live${live ? " is-on" : ""}`} title={live ? "Updating live" : "Reconnecting"}>
             <span className="cv-live-dot" /> {live ? "Live" : "Offline"}
           </span>
@@ -142,44 +160,71 @@ export function App() {
         </div>
       </header>
 
-      <main className="cv-main">
-        {cluster && !cluster.connected ? (
-          <div className="cv-empty">
-            <p className="cv-empty-title">Can't reach the cluster</p>
-            <p className="cv-mono cv-empty-detail">{cluster.error}</p>
-          </div>
-        ) : !snapshot ? (
-          <div className="cv-empty">
-            <p className="cv-empty-title">Reading the cluster…</p>
-          </div>
-        ) : (
-          <>
-            {view === "map" && <ServiceMap snapshot={snapshot} showSystem={showSystem} selectedId={selected} onSelect={setSelected} />}
-            {view === "list" && (
-              <ListView snapshot={snapshot} showSystem={showSystem} onShowSystem={setShowSystem} selectedId={selected} onSelect={setSelected} />
-            )}
-            {view === "nodes" && <NodesView snapshot={snapshot} onSelect={goTo} />}
-            {view === "map" && (
-              <label className="cv-system-toggle">
-                <input type="checkbox" checked={showSystem} onChange={(e) => setShowSystem(e.target.checked)} />
-                Show cluster services
-              </label>
-            )}
-            {selectedService && view !== "nodes" && (
-              <ServiceDrawer
-                key={selectedService.id}
-                service={selectedService}
-                snapshot={snapshot}
-                me={me}
-                actions={actions}
-                ai={ai}
-                onClose={() => setSelected(null)}
-                onSelect={setSelected}
-              />
-            )}
-          </>
-        )}
-      </main>
+      <div className="cv-workspace">
+        <main className="cv-main">
+          {cluster && !cluster.connected ? (
+            <div className="cv-empty">
+              <p className="cv-empty-title">Can't reach the cluster</p>
+              <p className="cv-mono cv-empty-detail">{cluster.error}</p>
+            </div>
+          ) : !snapshot ? (
+            <div className="cv-empty">
+              <p className="cv-empty-title">Reading the cluster…</p>
+            </div>
+          ) : (
+            <>
+              {view === "map" && (
+                <ServiceMap
+                  snapshot={snapshot}
+                  showSystem={showSystem}
+                  selectedId={selected}
+                  detailsOpen={!chatOpen}
+                  onSelect={setSelected}
+                />
+              )}
+              {view === "list" && (
+                <ListView
+                  snapshot={snapshot}
+                  showSystem={showSystem}
+                  onShowSystem={setShowSystem}
+                  selectedId={selected}
+                  onSelect={setSelected}
+                />
+              )}
+              {view === "nodes" && <NodesView snapshot={snapshot} onSelect={goTo} />}
+              {view === "map" && (
+                <label className="cv-system-toggle">
+                  <input type="checkbox" checked={showSystem} onChange={(e) => setShowSystem(e.target.checked)} />
+                  Show cluster services
+                </label>
+              )}
+              {selectedService && !chatOpen && view !== "nodes" && (
+                <ServiceDrawer
+                  key={selectedService.id}
+                  service={selectedService}
+                  snapshot={snapshot}
+                  me={me}
+                  actions={actions}
+                  ai={ai}
+                  onClose={() => setSelected(null)}
+                  onSelect={setSelected}
+                />
+              )}
+            </>
+          )}
+        </main>
+        <AssistantPanel
+          open={chatOpen}
+          ai={ai}
+          selected={selectedService}
+          onClose={closeAssistant}
+          onInspect={() => {
+            setChatOpen(false);
+            if (view === "nodes") setView("map");
+          }}
+          onClearSelection={() => setSelected(null)}
+        />
+      </div>
 
       {searching && snapshot && <SearchPalette snapshot={snapshot} onPick={goTo} onClose={() => setSearching(false)} />}
     </div>
