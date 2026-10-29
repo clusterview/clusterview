@@ -72,6 +72,11 @@ type Config struct {
 	// which signs everyone out when the pod restarts.
 	SessionKey []byte
 	SessionTTL time.Duration
+
+	// BasePath is where the dashboard is served, such as "/clusterview", or
+	// empty at the root. Requests reach this package with it already removed;
+	// it's added back to redirects and cookie paths.
+	BasePath string
 }
 
 // User is whoever made a request.
@@ -120,7 +125,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Authenticator, err
 			return nil, err
 		}
 	}
-	a := &Authenticator{cfg: cfg, log: log, sessions: sessions{key: cfg.SessionKey}}
+	a := &Authenticator{cfg: cfg, log: log, sessions: sessions{key: cfg.SessionKey, path: cfg.BasePath + "/"}}
 
 	switch cfg.Mode {
 	case ModeNone, ModeProxy:
@@ -234,7 +239,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		case !ok && a.cfg.Mode == ModeOIDC && !api:
 			// Always our own sign-in path; the return target is escaped here and
 			// checked by safeReturn when used.
-			http.Redirect(w, r, "/auth/login?return="+urlQueryEscape(r.URL.RequestURI()), http.StatusFound) //nolint:gosec // G710: fixed local path
+			http.Redirect(w, r, a.cfg.BasePath+"/auth/login?return="+urlQueryEscape(r.URL.RequestURI()), http.StatusFound) //nolint:gosec // G710: fixed local path
 			return
 		case !ok:
 			deny(w, api, http.StatusUnauthorized, "Sign in first.")

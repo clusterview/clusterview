@@ -39,6 +39,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["--addr=:{{ .Values.service.port }}"]
           env:
+            {{- with .Values.basePath }}
+            - name: CLUSTERVIEW_BASE_PATH
+              value: {{ . | quote }}
+            {{- end }}
             - name: CLUSTERVIEW_NAMESPACES
               value: {{ join "," .Values.scope.namespaces | quote }}
             - name: CLUSTERVIEW_NODES

@@ -134,7 +134,7 @@ export function App() {
             </span>
           )}
           {me?.mode === "oidc" && (
-            <a className="cv-signout" href="/auth/logout">
+            <a className="cv-signout" href="auth/logout">
               Sign out
             </a>
           )}

@@ -8,7 +8,8 @@ export const mockName = import.meta.env.DEV ? new URLSearchParams(window.locatio
 
 export async function mockResponse(path: string, body?: { serviceId?: string }): Promise<unknown | undefined> {
   if (!import.meta.env.DEV || !mockName) return undefined;
-  const route = path.split("?")[0];
+  // The app asks with paths relative to the page ("api/v1/…").
+  const route = "/" + path.split("?")[0].replace(/^\/+/, "");
   switch (route) {
     case "/api/v1/snapshot":
       return mockName === "kind" ? (await import("./mock/kind.json")).default : (await import("./mock/demo.json")).default;

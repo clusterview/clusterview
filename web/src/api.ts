@@ -217,13 +217,13 @@ async function getJSON<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export const getCluster = () => getJSON<ClusterInfo>("/api/v1/cluster");
-export const getVersion = () => getJSON<VersionInfo>("/api/v1/version");
-export const getSnapshot = () => getJSON<Snapshot>("/api/v1/snapshot");
-export const getNodes = () => getJSON<Nodes>("/api/v1/nodes");
+export const getCluster = () => getJSON<ClusterInfo>("api/v1/cluster");
+export const getVersion = () => getJSON<VersionInfo>("api/v1/version");
+export const getSnapshot = () => getJSON<Snapshot>("api/v1/snapshot");
+export const getNodes = () => getJSON<Nodes>("api/v1/nodes");
 
 function logsPath(ns: string, pod: string) {
-  return `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pod)}/logs`;
+  return `api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pod)}/logs`;
 }
 
 export function getLogs(ns: string, pod: string, container: string, previous: boolean) {
@@ -255,7 +255,7 @@ export interface AuditEntry {
   error?: string;
 }
 
-export const getActionsConfig = () => getJSON<ActionsConfig>("/api/v1/actions");
+export const getActionsConfig = () => getJSON<ActionsConfig>("api/v1/actions");
 
 async function act(path: string, body?: unknown): Promise<AuditEntry> {
   const mocked = await mockResponse(path);
@@ -271,12 +271,12 @@ async function act(path: string, body?: unknown): Promise<AuditEntry> {
 }
 
 const seg = encodeURIComponent;
-export const restartPod = (ns: string, pod: string) => act(`/api/v1/namespaces/${seg(ns)}/pods/${seg(pod)}/restart`);
+export const restartPod = (ns: string, pod: string) => act(`api/v1/namespaces/${seg(ns)}/pods/${seg(pod)}/restart`);
 export const restartWorkload = (kind: string, ns: string, name: string) =>
-  act(`/api/v1/workloads/${seg(kind)}/${seg(ns)}/${seg(name)}/restart`);
+  act(`api/v1/workloads/${seg(kind)}/${seg(ns)}/${seg(name)}/restart`);
 export const scaleWorkload = (kind: string, ns: string, name: string, replicas: number) =>
-  act(`/api/v1/workloads/${seg(kind)}/${seg(ns)}/${seg(name)}/scale`, { replicas });
-export const runCronJob = (ns: string, name: string) => act(`/api/v1/workloads/CronJob/${seg(ns)}/${seg(name)}/run`);
+  act(`api/v1/workloads/${seg(kind)}/${seg(ns)}/${seg(name)}/scale`, { replicas });
+export const runCronJob = (ns: string, name: string) => act(`api/v1/workloads/CronJob/${seg(ns)}/${seg(name)}/run`);
 
 export interface Me {
   name: string;
@@ -285,7 +285,7 @@ export interface Me {
   mode: "none" | "proxy" | "oidc";
 }
 
-export const getMe = () => getJSON<Me>("/api/v1/me");
+export const getMe = () => getJSON<Me>("api/v1/me");
 
 export interface AIInfo {
   enabled: boolean;
@@ -306,12 +306,12 @@ export interface Diagnosis {
   redactions: number;
 }
 
-export const getAI = () => getJSON<AIInfo>("/api/v1/ai");
+export const getAI = () => getJSON<AIInfo>("api/v1/ai");
 
 export async function findError(serviceId: string, fresh: boolean): Promise<Diagnosis> {
-  const mocked = await mockResponse("/api/v1/diagnose", { serviceId });
+  const mocked = await mockResponse("api/v1/diagnose", { serviceId });
   if (mocked !== undefined) return mocked as Diagnosis;
-  const res = await fetch("/api/v1/diagnose", {
+  const res = await fetch("api/v1/diagnose", {
     method: "POST",
     headers: { "X-Clusterview-Action": "1", "Content-Type": "application/json" },
     body: JSON.stringify({ serviceId, fresh }),

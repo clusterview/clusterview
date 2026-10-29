@@ -40,6 +40,16 @@ type session struct {
 type sessions struct {
 	key    []byte
 	secure bool
+	// path limits the cookies to the dashboard, so they don't reach other
+	// apps on the same host.
+	path string
+}
+
+func (s sessions) cookiePath() string {
+	if s.path == "" {
+		return "/"
+	}
+	return s.path
 }
 
 func (s sessions) write(w http.ResponseWriter, name string, v session, ttl time.Duration) {
@@ -49,7 +59,7 @@ func (s sessions) write(w http.ResponseWriter, name string, v session, ttl time.
 	// Secure is on whenever the dashboard is served over https (its redirect
 	// URL); over a plain-http port-forward the browser wouldn't keep it.
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure follows the scheme, see above
-		Name: name, Value: payload + "." + s.sign(payload), Path: "/",
+		Name: name, Value: payload + "." + s.sign(payload), Path: s.cookiePath(),
 		MaxAge: int(ttl.Seconds()), HttpOnly: true, Secure: s.secure, SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -75,7 +85,7 @@ func (s sessions) read(r *http.Request, name string) (session, bool) {
 }
 
 func (s sessions) clear(w http.ResponseWriter, name string) {
-	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secure, SameSite: http.SameSiteLaxMode}) //nolint:gosec // G124: as in write
+	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: s.cookiePath(), MaxAge: -1, HttpOnly: true, Secure: s.secure, SameSite: http.SameSiteLaxMode}) //nolint:gosec // G124: as in write
 }
 
 func (s sessions) sign(payload string) string {
@@ -96,7 +106,7 @@ func (a *Authenticator) Routes(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>Signed out</title>` +
 			`<body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh">` +
-			`<p>You're signed out of clusterview. <a href="/auth/login">Sign in again</a></p>`))
+			`<p>You're signed out of clusterview. <a href="login">Sign in again</a></p>`))
 	})
 }
 
@@ -146,12 +156,12 @@ func (a *Authenticator) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	a.sessions.write(w, sessionCookie, session{Name: name, Groups: groups}, a.cfg.SessionTTL)
 	a.log.Info("signed in", "user", name)
-	http.Redirect(w, r, st.Return, http.StatusFound)
+	http.Redirect(w, r, a.cfg.BasePath+st.Return, http.StatusFound)
 }
 
 func (a *Authenticator) logout(w http.ResponseWriter, r *http.Request) {
 	a.sessions.clear(w, sessionCookie)
-	http.Redirect(w, r, "/auth/signed-out", http.StatusFound)
+	http.Redirect(w, r, a.cfg.BasePath+"/auth/signed-out", http.StatusFound)
 }
 
 // safeReturn only allows a path on this site, so sign-in can't be used to

@@ -69,6 +69,24 @@ and their metrics only); turn it off with `scope.nodes=false`. Actions are
 limited to the watched namespaces unless `actions.namespaces` narrows them
 further.
 
+### Under a path, next to other apps
+
+To serve it on a host other apps already use, the way Grafana often lives
+at `/grafana`, set `basePath`:
+
+```bash
+helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview --reuse-values \
+  --set basePath=/clusterview \
+  --set ingress.enabled=true --set 'ingress.hosts[0].host=apps.example.com'
+```
+
+The dashboard is then at `https://apps.example.com/clusterview/`. With the
+chart's ingress, a `/` path becomes `/clusterview`; with your own ingress, route
+`/clusterview` to the `clusterview` Service without rewriting the path. Sign-in
+cookies stay under that path, and the health checks still answer at `/healthz`
+and `/readyz`. For OIDC, register `https://apps.example.com/clusterview/auth/callback`.
+On a laptop: `--base-path /clusterview`.
+
 ### What it can access
 
 By default the chart creates a ClusterRole that can **read** workloads, pods,

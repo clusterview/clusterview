@@ -46,7 +46,7 @@ export function useLive<T>(load: () => Promise<T>, enabled = true) {
         cancelled = true;
       };
     }
-    const events = new EventSource("/api/v1/events");
+    const events = new EventSource("api/v1/events");
     events.addEventListener("version", () => void refresh());
     events.onopen = () => setLive(true);
     events.onerror = () => setLive(false);

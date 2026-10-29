@@ -60,7 +60,7 @@ auth:
   oidc:
     issuerURL: ""
     clientID: ""
-    # https://<your dashboard host>/auth/callback, registered with the provider.
+    # https://<your dashboard host><basePath>/auth/callback, registered with the provider.
     redirectURL: ""
     scopes: [openid, email, profile]
     groupsClaim: groups
@@ -99,6 +99,11 @@ alerts:
   cluster: ""
   # Optional address people can open to investigate.
   dashboardURL: ""
+
+# Serve the dashboard under a path, such as /clusterview, when it shares a
+# host with other apps (like Grafana at /grafana). Empty: the root of its own
+# host. With the chart's ingress, a "/" path then becomes this path.
+basePath: ""
 
 service:
   type: ClusterIP

@@ -33,6 +33,7 @@
         "nodes": { "type": "boolean" }
       }
     },
+    "basePath": { "type": "string", "pattern": "^(/?[A-Za-z0-9._~-]+)*/?$" },
     "ai": {
       "type": "object",
       "properties": {
