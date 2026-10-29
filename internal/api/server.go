@@ -28,7 +28,14 @@ type Server struct {
 
 	diagnoser *diagnose.Diagnoser
 	aiInfo    AIInfo
+	// basePath is where the dashboard is served behind a shared host, such
+	// as "/clusterview"; empty at the root.
+	basePath string
 }
+
+// SetBasePath serves the dashboard under a path, such as "/clusterview", for
+// an ingress that shares its host with other apps. Call before Handler.
+func (s *Server) SetBasePath(p string) { s.basePath = p }
 
 // New returns a server. k, c and a are nil when no cluster could be reached;
 // the UI still loads and reports that. A nil authenticator means no login.
@@ -61,7 +68,35 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})
 	mux.Handle("/", spa(s.ui))
-	return s.auth.Middleware(mux)
+	return underPath(s.basePath, s.auth.Middleware(mux))
+}
+
+// underPath serves h under base, removing base from each request so routes
+// and the UI work as at the root. The health checks also answer at the
+// root, where the kubelet's probes ask.
+func underPath(base string, h http.Handler) http.Handler {
+	if base == "" {
+		return h
+	}
+	inner := http.StripPrefix(base, h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch p := r.URL.Path; {
+		case strings.HasPrefix(p, base+"/"):
+			inner.ServeHTTP(w, r)
+		case p == base:
+			// The UI loads its files relative to the page, so the page needs
+			// its trailing slash.
+			target := base + "/"
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently) //nolint:gosec // G710: our own fixed path
+		case p == "/healthz" || p == "/readyz":
+			h.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
 }
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {

@@ -33,6 +33,7 @@
         "nodes": { "type": "boolean" }
       }
     },
+    "basePath": { "type": "string", "pattern": "^(/?[A-Za-z0-9._~-]+)*/?$" },
     "ai": {
       "type": "object",
       "properties": {
@@ -66,7 +67,7 @@
     "auth": {
       "type": "object",
       "properties": {
-        "mode": { "type": "string", "enum": ["none", "proxy", "oidc"] },
+        "mode": { "type": "string", "enum": ["none", "proxy", "oidc", "password"] },
         "viewers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "operators": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "proxy": {

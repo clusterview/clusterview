@@ -48,6 +48,9 @@ auth:
   #          send the headers themselves.
   #   oidc   sign in with an OpenID Connect provider (Okta, Entra ID, Google,
   #          Keycloak, Dex…).
+  #   password  one shared password from auth.existingSecret (key password),
+  #          like Grafana's built-in login. Nobody is told apart, so keep
+  #          actions off or limit operators.
   mode: none
   # Who may look, and who may also act. Entries: a user (email), group:<name>,
   # *@<domain>, or *. Empty viewers: anyone signed in. Empty operators: nobody
@@ -60,12 +63,13 @@ auth:
   oidc:
     issuerURL: ""
     clientID: ""
-    # https://<your dashboard host>/auth/callback, registered with the provider.
+    # https://<your dashboard host><basePath>/auth/callback, registered with the provider.
     redirectURL: ""
     scopes: [openid, email, profile]
     groupsClaim: groups
-  # A Secret in this namespace with clientSecret (oidc) and sessionKey (any
-  # long random string; keeps people signed in when the pod restarts).
+  # A Secret in this namespace with clientSecret (oidc) or password (password
+  # mode, at least 12 characters), and sessionKey (any long random string;
+  # keeps people signed in when the pod restarts).
   existingSecret: ""
 
 ai:
@@ -99,6 +103,11 @@ alerts:
   cluster: ""
   # Optional address people can open to investigate.
   dashboardURL: ""
+
+# Serve the dashboard under a path, such as /clusterview, when it shares a
+# host with other apps (like Grafana at /grafana). Empty: the root of its own
+# host. With the chart's ingress, a "/" path then becomes this path.
+basePath: ""
 
 service:
   type: ClusterIP

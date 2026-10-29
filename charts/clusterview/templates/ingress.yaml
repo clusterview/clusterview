@@ -24,7 +24,7 @@ spec:
       http:
         paths:
           {{- range .paths }}
-          - path: {{ .path }}
+          - path: {{ if and $.Values.basePath (eq .path "/") }}{{ include "clusterview.basePath" $ }}{{ else }}{{ .path }}{{ end }}
             pathType: {{ .pathType }}
             backend:
               service:

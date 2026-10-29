@@ -1,6 +1,6 @@
 // Package auth decides who is looking at the dashboard and what they may do.
 //
-// Three modes:
+// Four modes:
 //   - none: no login. Fine behind kubectl port-forward, where only people
 //     with cluster access can reach the dashboard. Everyone is an operator
 //     (actions still need actions.enabled).
@@ -8,6 +8,8 @@
 //     auth-url) has signed the person in and passes who they are in headers.
 //   - oidc: clusterview signs people in itself with any OpenID Connect
 //     provider (Okta, Entra ID, Google, Keycloak, Dex…).
+//   - password: one shared password, like Grafana's built-in login. Simple to
+//     set up; nobody is told apart.
 //
 // Viewers may look; operators may also act. Lists match an exact user,
 // "group:<name>", "*@<domain>" or "*".
@@ -36,6 +38,8 @@ const (
 	ModeNone  Mode = "none"
 	ModeProxy Mode = "proxy"
 	ModeOIDC  Mode = "oidc"
+	// ModePassword signs everyone in with one shared password.
+	ModePassword Mode = "password"
 )
 
 // Role is what someone may do.
@@ -68,10 +72,18 @@ type Config struct {
 	Scopes       []string
 	GroupsClaim  string // default "groups"
 
+	// Password mode: the shared password.
+	Password string
+
 	// SessionKey signs session cookies. A random one is made when empty,
 	// which signs everyone out when the pod restarts.
 	SessionKey []byte
 	SessionTTL time.Duration
+
+	// BasePath is where the dashboard is served, such as "/clusterview", or
+	// empty at the root. Requests reach this package with it already removed;
+	// it's added back to redirects and cookie paths.
+	BasePath string
 }
 
 // User is whoever made a request.
@@ -120,7 +132,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Authenticator, err
 			return nil, err
 		}
 	}
-	a := &Authenticator{cfg: cfg, log: log, sessions: sessions{key: cfg.SessionKey}}
+	a := &Authenticator{cfg: cfg, log: log, sessions: sessions{key: cfg.SessionKey, path: cfg.BasePath + "/"}}
 
 	switch cfg.Mode {
 	case ModeNone, ModeProxy:
@@ -138,8 +150,12 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Authenticator, err
 			Endpoint: provider.Endpoint(), Scopes: cfg.Scopes,
 		}
 		a.sessions.secure = strings.HasPrefix(cfg.RedirectURL, "https://")
+	case ModePassword:
+		if len(cfg.Password) < minPasswordLength {
+			return nil, fmt.Errorf("password mode needs a password of at least %d characters", minPasswordLength)
+		}
 	default:
-		return nil, fmt.Errorf("unknown auth mode %q (use none, proxy or oidc)", cfg.Mode)
+		return nil, fmt.Errorf("unknown auth mode %q (use none, proxy, oidc or password)", cfg.Mode)
 	}
 	return a, nil
 }
@@ -158,7 +174,7 @@ func (a *Authenticator) identify(r *http.Request) (User, bool) {
 			return User{}, false
 		}
 		return a.withRole(User{Name: name, Groups: splitGroups(r.Header.Get(a.cfg.GroupsHeader))}), true
-	case ModeOIDC:
+	case ModeOIDC, ModePassword:
 		s, ok := a.sessions.read(r, sessionCookie)
 		if !ok {
 			return User{}, false
@@ -231,10 +247,10 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		api := strings.HasPrefix(p, "/api/")
 		u, ok := a.identify(r)
 		switch {
-		case !ok && a.cfg.Mode == ModeOIDC && !api:
+		case !ok && (a.cfg.Mode == ModeOIDC || a.cfg.Mode == ModePassword) && !api:
 			// Always our own sign-in path; the return target is escaped here and
 			// checked by safeReturn when used.
-			http.Redirect(w, r, "/auth/login?return="+urlQueryEscape(r.URL.RequestURI()), http.StatusFound) //nolint:gosec // G710: fixed local path
+			http.Redirect(w, r, a.cfg.BasePath+"/auth/login?return="+urlQueryEscape(r.URL.RequestURI()), http.StatusFound) //nolint:gosec // G710: fixed local path
 			return
 		case !ok:
 			deny(w, api, http.StatusUnauthorized, "Sign in first.")

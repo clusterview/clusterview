@@ -106,6 +106,8 @@ jobs:
         run: |
           helm template t charts/clusterview | kubeconform -strict -summary
           helm template t charts/clusterview --set ingress.enabled=true --set networkPolicy.enabled=true | kubeconform -strict -summary
+          helm template t charts/clusterview --set ingress.enabled=true --set basePath=/clusterview | kubeconform -strict -summary
+          helm template t charts/clusterview --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
       - name: Reject incomplete alert settings
@@ -266,6 +268,16 @@ jobs:
           test "$(kubectl auth can-i delete deployments -A --as=$sa)" = no
           test "$(kubectl auth can-i get secrets -A --as=$sa)" = no
           test "$(kubectl auth can-i create pods/exec -A --as=$sa)" = no
+      - name: Served under a path
+        run: |
+          helm upgrade clusterview charts/clusterview -n clusterview --reuse-values --set basePath=/clusterview --wait --timeout 3m
+          kubectl -n clusterview rollout status deploy/clusterview --timeout=2m
+          kubectl -n clusterview port-forward svc/clusterview 8082:8080 &
+          for _ in $(seq 1 20); do curl -sf localhost:8082/readyz && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' localhost:8082/clusterview)" = "301 http://localhost:8082/clusterview/"
+          curl -sf localhost:8082/clusterview/ | grep -q '<div id="root">'
+          curl -sf localhost:8082/clusterview/api/v1/cluster | jq -e '.connected == true'
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8082/api/v1/cluster)" = 404
       - name: Debug on failure
         if: failure()
         run: |

@@ -133,8 +133,8 @@ export function App() {
               {initials(me.name)}
             </span>
           )}
-          {me?.mode === "oidc" && (
-            <a className="cv-signout" href="/auth/logout">
+          {(me?.mode === "oidc" || me?.mode === "password") && (
+            <a className="cv-signout" href="auth/logout">
               Sign out
             </a>
           )}

@@ -4,12 +4,12 @@ Open it:
 
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "clusterview.fullname" . }} {{ .Values.service.port }}
 
-then visit http://localhost:{{ .Values.service.port }}
+then visit http://localhost:{{ .Values.service.port }}{{ include "clusterview.basePath" . }}/
 {{- if .Values.ingress.enabled }}
 
 Or through the ingress:
 {{- range .Values.ingress.hosts }}
-  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ include "clusterview.basePath" $ }}/
 {{- end }}
 {{- end }}
 {{- if and .Values.actions.enabled (eq .Values.auth.mode "none") }}

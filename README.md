@@ -69,6 +69,24 @@ and their metrics only); turn it off with `scope.nodes=false`. Actions are
 limited to the watched namespaces unless `actions.namespaces` narrows them
 further.
 
+### Under a path, next to other apps
+
+To serve it on a host other apps already use, the way Grafana often lives
+at `/grafana`, set `basePath`:
+
+```bash
+helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview --reuse-values \
+  --set basePath=/clusterview \
+  --set ingress.enabled=true --set 'ingress.hosts[0].host=apps.example.com'
+```
+
+The dashboard is then at `https://apps.example.com/clusterview/`. With the
+chart's ingress, a `/` path becomes `/clusterview`; with your own ingress, route
+`/clusterview` to the `clusterview` Service without rewriting the path. Sign-in
+cookies stay under that path, and the health checks still answer at `/healthz`
+and `/readyz`. For OIDC, register `https://apps.example.com/clusterview/auth/callback`.
+On a laptop: `--base-path /clusterview`.
+
 ### What it can access
 
 By default the chart creates a ClusterRole that can **read** workloads, pods,
@@ -113,6 +131,7 @@ browser won't send cross-site.
 | `none` (default) | Nobody; everyone may act (if actions are on) | You reach it with `kubectl port-forward`, so only people with cluster access can |
 | `proxy` | Whoever an auth proxy says, from `X-Forwarded-Email` and `X-Forwarded-Groups` | oauth2-proxy, Pomerium, or an ingress `auth-url` sits in front. Keep the dashboard reachable only through the proxy (`networkPolicy`), or anyone could send those headers |
 | `oidc` | People who sign in with your OpenID Connect provider (Okta, Entra ID, Google, Keycloak, Dex…) | You expose it with an ingress |
+| `password` | Anyone with the one shared password, like Grafana's built-in login | You expose it to a small team and want no identity provider. Nobody is told apart, so keep actions off |
 
 `auth.viewers` may look and `auth.operators` may also act. Entries are a user
 (`ann@example.com`), `group:<name>`, `*@<domain>` or `*`. An empty viewers
@@ -132,6 +151,17 @@ helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n cluster
   --set auth.existingSecret=clusterview-auth \
   --set 'auth.viewers={*@example.com}' --set 'auth.operators={group:platform}'
 ```
+
+Password example (a password of at least 12 characters):
+
+```bash
+kubectl -n clusterview create secret generic clusterview-auth \
+  --from-literal=password="$(openssl rand -base64 24)" --from-literal=sessionKey="$(openssl rand -hex 32)"
+helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview --reuse-values \
+  --set auth.mode=password --set auth.existingSecret=clusterview-auth
+```
+
+A wrong password waits a second before answering, to slow guessing.
 
 Sign-in uses the authorization code flow with PKCE, state and nonce. The
 session is a signed, HttpOnly, SameSite=Lax cookie (Secure over https) that

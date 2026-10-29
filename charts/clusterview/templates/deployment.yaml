@@ -39,6 +39,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["--addr=:{{ .Values.service.port }}"]
           env:
+            {{- with .Values.basePath }}
+            - name: CLUSTERVIEW_BASE_PATH
+              value: {{ . | quote }}
+            {{- end }}
             - name: CLUSTERVIEW_NAMESPACES
               value: {{ join "," .Values.scope.namespaces | quote }}
             - name: CLUSTERVIEW_NODES
@@ -72,6 +76,11 @@ spec:
               value: {{ join "," .Values.auth.oidc.scopes | quote }}
             - name: CLUSTERVIEW_OIDC_GROUPS_CLAIM
               value: {{ .Values.auth.oidc.groupsClaim | quote }}
+            {{- end }}
+            {{- if eq .Values.auth.mode "password" }}
+            - name: CLUSTERVIEW_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ required "auth.existingSecret (with a password key) is required in password mode" .Values.auth.existingSecret | quote }}, key: password}
             {{- end }}
             {{- with .Values.auth.existingSecret }}
             - name: CLUSTERVIEW_OIDC_CLIENT_SECRET

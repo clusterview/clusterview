@@ -288,3 +288,26 @@ func TestOIDCConfigErrors(t *testing.T) {
 		t.Error("unknown mode should fail")
 	}
 }
+
+func TestSignInUnderAPath(t *testing.T) {
+	a := &Authenticator{
+		cfg:      Config{Mode: ModeOIDC, BasePath: "/clusterview"},
+		log:      slog.New(slog.DiscardHandler),
+		sessions: sessions{key: []byte("k"), path: "/clusterview/"},
+	}
+	// Requests arrive with the path already removed.
+	rec := httptest.NewRecorder()
+	a.Middleware(http.NotFoundHandler()).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/?select=x", nil))
+	if loc := rec.Header().Get("Location"); loc != "/clusterview/auth/login?return=%2F%3Fselect%3Dx" {
+		t.Errorf("sign-in redirect: %q", loc)
+	}
+
+	rec = httptest.NewRecorder()
+	a.logout(rec, httptest.NewRequest(http.MethodGet, "/auth/logout", nil))
+	if loc := rec.Header().Get("Location"); loc != "/clusterview/auth/signed-out" {
+		t.Errorf("sign-out redirect: %q", loc)
+	}
+	if c := rec.Result().Cookies(); len(c) != 1 || c[0].Path != "/clusterview/" {
+		t.Errorf("cookies must stay under the dashboard's path: %+v", c)
+	}
+}

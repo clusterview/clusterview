@@ -31,3 +31,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+The base path as the binary uses it: "/clusterview", or "" at the root.
+*/}}
+{{- define "clusterview.basePath" -}}
+{{- with trimAll "/" .Values.basePath }}/{{ . }}{{ end }}
+{{- end }}

@@ -46,6 +46,7 @@ type config struct {
 	auth        auth.Config
 	ai          ai.Config
 	alerts      alerts.Config
+	basePath    string
 }
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 	actionNamespaces := flag.String("actions-namespaces", os.Getenv("CLUSTERVIEW_ACTIONS_NAMESPACES"), "comma-separated namespaces actions may touch (default: those watched)")
 	flag.IntVar(&cfg.actions.MaxReplicas, "actions-max-replicas", envInt("CLUSTERVIEW_ACTIONS_MAX_REPLICAS", 20), "the most replicas scaling may set")
 
-	authMode := flag.String("auth", envOr("CLUSTERVIEW_AUTH", "none"), "how people sign in: none, proxy or oidc")
+	authMode := flag.String("auth", envOr("CLUSTERVIEW_AUTH", "none"), "how people sign in: none, proxy, oidc or password")
 	viewers := flag.String("auth-viewers", os.Getenv("CLUSTERVIEW_AUTH_VIEWERS"), "who may look: users, group:<name>, *@<domain>; empty means anyone signed in")
 	operators := flag.String("auth-operators", os.Getenv("CLUSTERVIEW_AUTH_OPERATORS"), "who may also act; empty means nobody unless --auth=none")
 	flag.StringVar(&cfg.auth.UserHeader, "auth-user-header", os.Getenv("CLUSTERVIEW_AUTH_USER_HEADER"), "proxy mode: header with the user (default X-Forwarded-Email)")
@@ -77,6 +78,7 @@ func main() {
 	scopes := flag.String("oidc-scopes", os.Getenv("CLUSTERVIEW_OIDC_SCOPES"), "oidc mode: scopes (default openid,email,profile)")
 	flag.StringVar(&cfg.auth.GroupsClaim, "oidc-groups-claim", os.Getenv("CLUSTERVIEW_OIDC_GROUPS_CLAIM"), "oidc mode: claim with the user's groups (default groups)")
 
+	basePath := flag.String("base-path", os.Getenv("CLUSTERVIEW_BASE_PATH"), "serve the dashboard under this path, such as /clusterview, when it shares a host with other apps")
 	flag.StringVar(&cfg.ai.Provider, "ai-provider", os.Getenv("CLUSTERVIEW_AI_PROVIDER"), "turns on Find error: anthropic, or openai (also for local OpenAI-compatible servers)")
 	flag.StringVar(&cfg.ai.Model, "ai-model", os.Getenv("CLUSTERVIEW_AI_MODEL"), "model to ask (default "+ai.DefaultAnthropicModel+" for anthropic; required for openai)")
 	flag.StringVar(&cfg.ai.BaseURL, "ai-base-url", os.Getenv("CLUSTERVIEW_AI_BASE_URL"), "another server for the openai provider, such as http://localhost:11434/v1 for Ollama")
@@ -109,7 +111,14 @@ func main() {
 	// Secrets come from the environment only, never flags (which ps shows).
 	cfg.auth.ClientSecret = os.Getenv("CLUSTERVIEW_OIDC_CLIENT_SECRET")
 	cfg.auth.SessionKey = []byte(os.Getenv("CLUSTERVIEW_SESSION_KEY"))
+	cfg.auth.Password = os.Getenv("CLUSTERVIEW_AUTH_PASSWORD")
 	cfg.ai.APIKey = aiKey(cfg.ai.Provider)
+	bp, err := cleanBasePath(*basePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	cfg.basePath, cfg.auth.BasePath = bp, bp
 	cfg.alerts.WebhookURL = os.Getenv("CLUSTERVIEW_ALERTS_WEBHOOK_URL")
 	if cfg.addr == "" {
 		cfg.addr = "127.0.0.1:8080" // on a laptop, never listen beyond it
@@ -179,6 +188,7 @@ func run(cfg config, log *slog.Logger) error {
 		return err
 	}
 	server := api.New(k, c, runner, authn, web.UI(), log)
+	server.SetBasePath(cfg.basePath)
 	if model != nil && c != nil {
 		server.SetAI(diagnose.New(model, c), api.AIInfo{Enabled: true, Model: model.Name(), Describe: cfg.ai.Describe})
 		log.Info("AI", "model", model.Name(), "describe", cfg.ai.Describe)
@@ -188,7 +198,7 @@ func run(cfg config, log *slog.Logger) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	url := "http://" + browsable(ln.Addr().String())
+	url := "http://" + browsable(ln.Addr().String()) + cfg.basePath + "/"
 	log.Info("listening", "url", url, "version", version.Version)
 	if cfg.open {
 		fmt.Fprintf(os.Stderr, "clusterview is at %s (Ctrl+C to stop)\n", url)
@@ -247,6 +257,19 @@ func openBrowser(url string, log *slog.Logger) {
 	if err := cmd.Start(); err != nil {
 		log.Info("couldn't open a browser", "err", err)
 	}
+}
+
+// cleanBasePath turns "clusterview/" or "/clusterview/" into "/clusterview",
+// and "/" into "" (the root).
+func cleanBasePath(p string) (string, error) {
+	p = strings.Trim(strings.TrimSpace(p), "/")
+	if p == "" {
+		return "", nil
+	}
+	if strings.ContainsAny(p, "?#%\\ ") || strings.Contains(p, "//") || strings.Contains(p, "..") {
+		return "", fmt.Errorf("--base-path %q: use a plain path such as /clusterview", p)
+	}
+	return "/" + p, nil
 }
 
 // aiKey reads the model's key from the environment, never a flag. On a
