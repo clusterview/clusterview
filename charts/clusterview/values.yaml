@@ -83,6 +83,7 @@ ai:
   baseURL: ""
   # A Secret in this namespace with apiKey. Not needed for a local model
   # without a key.
+  # Missing required cloud keys leave AI off; the dashboard shows setup.
   existingSecret: ""
   # Describe services the catalogue doesn't know from their image names
   # (registry removed), marked "AI guess" in the dashboard.

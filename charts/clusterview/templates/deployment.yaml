@@ -103,7 +103,7 @@ spec:
             {{- with .existingSecret }}
             - name: CLUSTERVIEW_AI_API_KEY
               valueFrom:
-                secretKeyRef: {name: {{ . | quote }}, key: apiKey}
+                secretKeyRef: {name: {{ . | quote }}, key: apiKey, optional: true}
             {{- end }}
             {{- end }}
             {{- end }}

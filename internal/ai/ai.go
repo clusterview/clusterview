@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -38,6 +39,9 @@ type Config struct {
 // ErrOff means no model is set up.
 var ErrOff = errors.New("AI isn't set up: set ai.provider and a key (see the README)")
 
+// ErrMissingKey means the selected provider needs an API key before AI can be enabled.
+var ErrMissingKey = errors.New("AI provider API key is missing")
+
 // Model answers one question with JSON matching a schema.
 type Model interface {
 	// JSON sends system and user and returns the model's JSON reply.
@@ -64,13 +68,16 @@ func New(cfg Config) (Model, error) {
 	case "", "none", "off":
 		return nil, nil
 	case ProviderAnthropic:
-		if cfg.APIKey == "" {
-			return nil, errors.New("ai.provider is anthropic but no API key is set (CLUSTERVIEW_AI_API_KEY or ANTHROPIC_API_KEY)")
+		if strings.TrimSpace(cfg.APIKey) == "" {
+			return nil, fmt.Errorf("%w: set CLUSTERVIEW_AI_API_KEY or ANTHROPIC_API_KEY", ErrMissingKey)
 		}
 		return newAnthropic(cfg), nil
 	case ProviderGemini:
-		if cfg.APIKey == "" || cfg.Model == "" {
-			return nil, errors.New("ai.provider is gemini: set ai.model and an API key (CLUSTERVIEW_AI_API_KEY or GEMINI_API_KEY)")
+		if strings.TrimSpace(cfg.APIKey) == "" {
+			return nil, fmt.Errorf("%w: set CLUSTERVIEW_AI_API_KEY or GEMINI_API_KEY", ErrMissingKey)
+		}
+		if cfg.Model == "" {
+			return nil, errors.New("ai.provider is gemini: name a model with ai.model (--ai-model)")
 		}
 		if cfg.BaseURL == "" {
 			cfg.BaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -79,11 +86,13 @@ func New(cfg Config) (Model, error) {
 		m.label = "Gemini · " + cfg.Model
 		return m, nil
 	case ProviderOpenAI:
+		endpoint, _ := url.Parse(cfg.BaseURL)
+		requiresKey := cfg.BaseURL == "" || (endpoint != nil && strings.EqualFold(endpoint.Hostname(), "api.openai.com"))
+		if strings.TrimSpace(cfg.APIKey) == "" && requiresKey {
+			return nil, fmt.Errorf("%w: set CLUSTERVIEW_AI_API_KEY or OPENAI_API_KEY", ErrMissingKey)
+		}
 		if cfg.Model == "" {
 			return nil, errors.New("ai.provider is openai: name a model with ai.model (--ai-model)")
-		}
-		if cfg.APIKey == "" && cfg.BaseURL == "" {
-			return nil, errors.New("ai.provider is openai but no API key is set (CLUSTERVIEW_AI_API_KEY or OPENAI_API_KEY)")
 		}
 		return newOpenAI(cfg), nil
 	}

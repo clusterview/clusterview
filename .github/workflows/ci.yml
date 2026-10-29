@@ -282,6 +282,20 @@ jobs:
           curl -sf localhost:8082/clusterview/ | grep -q '<div id="root">'
           curl -sf localhost:8082/clusterview/api/v1/cluster | jq -e '.connected == true'
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8082/api/v1/cluster)" = 404
+      - name: Missing AI credential keeps the dashboard available
+        run: |
+          helm upgrade clusterview charts/clusterview -n clusterview --reuse-values \
+            --set ai.provider=openai --set ai.model=configured-model --set ai.existingSecret=missing-ai \
+            --wait --timeout 3m
+          kubectl -n clusterview rollout status deploy/clusterview --timeout=2m
+          kubectl -n clusterview port-forward svc/clusterview 8083:8080 &
+          for _ in $(seq 1 20); do curl -sf localhost:8083/readyz && break; sleep 1; done
+          curl -sf localhost:8083/clusterview/ | grep -q '<div id="root">'
+          curl -sf localhost:8083/clusterview/api/v1/cluster | jq -e '.connected == true'
+          curl -sf localhost:8083/clusterview/api/v1/ai | jq -e '.enabled == false and .chat == false and .describe == false'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Clusterview-Action: 1' \
+            -H 'Content-Type: application/json' --data '{"message":"What needs attention?"}' \
+            localhost:8083/clusterview/api/v1/assistant)" = 404
       - name: Debug on failure
         if: failure()
         run: |

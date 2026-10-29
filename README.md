@@ -181,7 +181,9 @@ lasts 12 hours. Without a `sessionKey`, a restart signs everyone out.
 The same provider also powers the **Cluster assistant** sidebar: chat about
 cluster health, inspect targeted evidence and copy a handoff for a coding agent.
 It uses one model for scope checks and investigation. See [setup, limits and data
-handling](docs/features/cluster-assistant.md).
+handling](docs/features/cluster-assistant.md). Missing cloud API keys leave the
+dashboard running with AI disabled and setup guidance in the sidebar; keyless
+local endpoints still work.
 
 Off until you bring a key. Then a broken service's drawer gets a **Find
 error** button: clusterview gathers what Kubernetes knows about it (its
