@@ -13,18 +13,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: go vet ./...
+          cache: false
+      # Each job keeps its own Go build cache (race, cross-compiled and plain
+      # builds don't share objects). PRs restore main's; only main saves, so
+      # PR runs don't push main's caches out.
+      - uses: actions/cache/restore@v6
+        id: go-cache
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-lint-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-lint-${{ hashFiles('go.sum') }}-
+            go-lint-
+      # golangci-lint runs go vet's checks too (govet).
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Each job keeps its own Go build cache (race, cross-compiled and plain
+      # builds don't share objects). PRs restore main's; only main saves, so
+      # PR runs don't push main's caches out.
+      - uses: actions/cache/restore@v6
+        id: go-cache
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-test-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ hashFiles('go.sum') }}-
+            go-test-
       - run: go test -race ./...
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
   web:
     runs-on: ubuntu-latest
@@ -46,10 +96,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v5
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - run: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.7.0
+      - name: Install kubeconform
+        run: |
+          curl -fsSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+          echo "c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3  kubeconform.tar.gz" | sha256sum -c -
+          sudo tar -xzf kubeconform.tar.gz -C /usr/local/bin kubeconform
       - run: helm lint charts/clusterview
       - name: Validate rendered manifests
         run: |
@@ -79,6 +130,20 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false
+      # Each job keeps its own Go build cache (race, cross-compiled and plain
+      # builds don't share objects). PRs restore main's; only main saves, so
+      # PR runs don't push main's caches out.
+      - uses: actions/cache/restore@v6
+        id: go-cache
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-release-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-release-${{ hashFiles('go.sum') }}-
+            go-release-
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -94,10 +159,17 @@ jobs:
         run: |
           find dist -maxdepth 1 \( -name '*.tar.gz' -o -name '*.zip' \) | sort
           test "$(find dist -maxdepth 1 \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l)" -eq 12
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
   # Installs the chart on a real cluster and checks the dashboard can read it.
+  # Runs alongside the other jobs rather than after them.
   e2e:
-    needs: [go, web, chart]
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/clusterview/clusterview:ci
@@ -107,6 +179,26 @@ jobs:
         with:
           cluster_name: clusterview
       - uses: docker/setup-buildx-action@v4
+      # Keeps the Dockerfile's Go cache mounts between runs, so the image
+      # build only compiles what changed.
+      - uses: actions/cache@v6
+        id: docker-go-cache
+        with:
+          path: |
+            docker-go-build
+            docker-go-mod
+          key: docker-go-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            docker-go-${{ hashFiles('go.sum') }}-
+            docker-go-
+      - uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: |
+            {
+              "docker-go-build": "/root/.cache/go-build",
+              "docker-go-mod": "/go/pkg/mod"
+            }
+          skip-extraction: ${{ steps.docker-go-cache.outputs.cache-hit }}
       - uses: docker/build-push-action@v6
         with:
           context: .
