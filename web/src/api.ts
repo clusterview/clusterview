@@ -312,6 +312,7 @@ export interface Me {
 export const getMe = () => getJSON<Me>("api/v1/me");
 
 export interface AIInfo {
+  chat: boolean;
   enabled: boolean;
   model?: string;
   describe: boolean;

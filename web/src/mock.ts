@@ -6,7 +6,7 @@ import type { NodePod, Nodes, Snapshot } from "./api";
 
 export const mockName = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("mock") : null;
 
-export async function mockResponse(path: string, body?: { serviceId?: string }): Promise<unknown | undefined> {
+export async function mockResponse(path: string, body?: { serviceId?: string; message?: string; sessionId?: string; selectedServiceId?: string }): Promise<unknown | undefined> {
   if (!import.meta.env.DEV || !mockName) return undefined;
   // The app asks with paths relative to the page ("api/v1/…").
   const route = "/" + path.split("?")[0].replace(/^\/+/, "");
@@ -26,7 +26,19 @@ export async function mockResponse(path: string, body?: { serviceId?: string }):
     case "/api/v1/audit":
       return [];
     case "/api/v1/ai":
-      return { enabled: new URLSearchParams(window.location.search).get("ai") !== "off", model: "Anthropic · claude-opus-5-5", describe: true };
+      return {
+        enabled: new URLSearchParams(window.location.search).get("ai") !== "off",
+        model: "Anthropic · claude-opus-5-5",
+        describe: true,
+        chat: new URLSearchParams(window.location.search).get("ai") !== "off",
+      };
+    case "/api/v1/assistant/forget":
+      return {};
+    case "/api/v1/assistant":
+      await new Promise((r) => setTimeout(r, 1200));
+      if (new URLSearchParams(window.location.search).has("assistantError"))
+        throw new Error("Demo provider unavailable. Try again or start a new chat.");
+      return mockAssistant(body?.message ?? "", body?.sessionId ?? "demo-session");
     case "/api/v1/diagnose":
       await new Promise((r) => setTimeout(r, 2200));
       return mockDiagnosis(body?.serviceId ?? "");
@@ -153,4 +165,39 @@ function mockNodes(snap: Snapshot): Nodes {
     };
   });
   return { fetchedAt: snap.fetchedAt, metrics: true, nodes, unscheduled };
+}
+
+function mockAssistant(message: string, sessionId: string) {
+  const offTopic = /weather|doctor|holiday/i.test(message);
+  const quote = "Payment provider rejected the API key: 401 Unauthorized";
+  const answer = offTopic
+    ? "I can help with this cluster’s health, failures and infrastructure. Ask about a service, node or Kubernetes issue."
+    : "Payments API is in a crash loop. Its previous container log reports that the payment provider rejected its API key with a 401 response. This points to a provider credential problem rather than a database outage. The actual credential has not been inspected.";
+  const now = new Date().toISOString();
+  return {
+    sessionId,
+    answer,
+    confidence: "medium",
+    decision: offTopic ? "off_topic" : "allow",
+    model: "Demo assistant · simulated evidence",
+    askedAt: now,
+    snapshotAt: now,
+    nextSteps: offTopic
+      ? []
+      : [
+          "Verify the payment provider’s credential status without exposing its value.",
+          "Ask a coding agent to check how Payments API loads and validates its configuration, then propose a fix and verification steps.",
+        ],
+    unknowns: offTopic ? [] : ["Whether the credential is expired, revoked or loaded from the wrong configuration."],
+    citations: offTopic ? [] : [{ source: "tool-1", quote }],
+    evidence: offTopic
+      ? []
+      : [
+          { id: "cluster", label: "Cluster overview", data: '{"services":14,"needAttention":1}' },
+          { id: "tool-1", label: "logs: shop/payments-api · app · previous", data: quote },
+        ],
+    handoff: offTopic
+      ? ""
+      : `Investigate Payments API in namespace shop.\n\nFinding: ${answer}\n\nEvidence: ${quote}\n\nVerify the credential source and provider status without exposing secrets. Confirm the relevant repository and files before proposing a fix. Include verification and rollback steps. No changes were made by Clusterview. This demo uses simulated evidence.`,
+  };
 }

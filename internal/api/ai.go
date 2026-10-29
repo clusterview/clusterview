@@ -5,11 +5,13 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/clusterview/clusterview/internal/assistant"
 	"github.com/clusterview/clusterview/internal/diagnose"
 )
 
 // AIInfo tells the UI whether Find error is available, and with what.
 type AIInfo struct {
+	Chat     bool   `json:"chat"`
 	Enabled  bool   `json:"enabled"`
 	Model    string `json:"model,omitempty"`
 	Describe bool   `json:"describe"`
@@ -21,11 +23,16 @@ func (s *Server) SetAI(d *diagnose.Diagnoser, info AIInfo) {
 	s.aiInfo = info
 }
 
+// SetAssistant enables the cluster conversation API with the shared configured model.
+func (s *Server) SetAssistant(a *assistant.Assistant) { s.assistant = a; s.aiInfo.Chat = a != nil }
+
 func (s *Server) aiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/ai", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, s.aiInfo)
 	})
 	mux.HandleFunc("POST /api/v1/diagnose", s.findError)
+	mux.HandleFunc("POST /api/v1/assistant", s.chat)
+	mux.HandleFunc("DELETE /api/v1/assistant/{session}", s.forgetChat)
 }
 
 // findError asks the model why a service is broken. It spends money on the

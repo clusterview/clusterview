@@ -73,11 +73,11 @@ auth:
   existingSecret: ""
 
 ai:
-  # Turns on Find error, which explains why a service is broken: anthropic,
+  # Turns on cluster chat and Find error: anthropic, gemini,
   # or openai (also any OpenAI-compatible server, such as Ollama or vLLM, with
   # baseURL). Empty: off; everything else works without it.
   provider: ""
-  # Default claude-opus-5-5 for anthropic; required for openai.
+  # Default claude-opus-5-5 for anthropic; required for openai and gemini.
   model: ""
   # For a local model: http://ollama.ollama:11434/v1
   baseURL: ""

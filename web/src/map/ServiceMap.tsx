@@ -12,6 +12,7 @@ import "./map.css";
 interface Props {
   snapshot: Snapshot;
   showSystem: boolean;
+  detailsOpen?: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }
@@ -24,7 +25,7 @@ export function ServiceMap(props: Props) {
   );
 }
 
-function MapCanvas({ snapshot, showSystem, selectedId, onSelect }: Props) {
+function MapCanvas({ snapshot, showSystem, selectedId, onSelect, detailsOpen = true }: Props) {
   const [focusConnections, setFocusConnections] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const selected = snapshot.services.find((service) => service.id === selectedId);
@@ -166,7 +167,7 @@ function MapCanvas({ snapshot, showSystem, selectedId, onSelect }: Props) {
   }, [graph, byId, focus, layoutState, showLabels]);
 
   return (
-    <div className={`cv-map${selected ? " has-selection" : ""}${focused ? " is-focused" : ""}`} onKeyDown={(event) => {
+    <div className={`cv-map${selected && detailsOpen ? " has-selection" : ""}${focused ? " is-focused" : ""}`} onKeyDown={(event) => {
       if (event.key === "Escape") { setFocusConnections(false); onSelect(null); }
     }}>
       <ReactFlow

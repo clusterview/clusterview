@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/clusterview/clusterview/internal/actions"
+	"github.com/clusterview/clusterview/internal/assistant"
 	"github.com/clusterview/clusterview/internal/auth"
 	"github.com/clusterview/clusterview/internal/cluster"
 	"github.com/clusterview/clusterview/internal/diagnose"
@@ -26,6 +27,7 @@ type Server struct {
 	ui      fs.FS
 	log     *slog.Logger
 
+	assistant *assistant.Assistant
 	diagnoser *diagnose.Diagnoser
 	aiInfo    AIInfo
 	// basePath is where the dashboard is served behind a shared host, such
