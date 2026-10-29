@@ -89,6 +89,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
 
   chart:
@@ -245,6 +246,9 @@ jobs:
           pod=$(kubectl -n clusterview get pods -l app.kubernetes.io/name=clusterview -o jsonpath='{.items[0].metadata.name}')
           curl -sf "localhost:8080/api/v1/namespaces/clusterview/pods/$pod/logs?tailLines=5" | tee logs.json | jq -e '.container == "clusterview" and (.lines | length) > 0'
           curl -sf localhost:8080/api/v1/nodes | jq -e '(.nodes | length) > 0'
+          service=$(curl -sf localhost:8080/api/v1/snapshot | jq -r '.services[] | select(.workloads | index("Deployment/clusterview/clusterview")) | .id')
+          test -n "$service"
+          curl -sfG localhost:8080/api/v1/services/logs --data-urlencode "serviceId=$service" --data-urlencode tailLines=5 | jq -e '(.lines | length) > 0 and all(.lines[]; .namespace == "clusterview" and .container == "clusterview" and (.pod | length) > 0)'
       - name: Read-only access
         run: |
           sa=system:serviceaccount:clusterview:clusterview

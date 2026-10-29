@@ -58,6 +58,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/events", s.needsCache(s.events))
 	mux.HandleFunc("GET /api/v1/namespaces/{namespace}/pods/{pod}/logs", s.needsCache(s.podLogs))
 	mux.HandleFunc("GET /api/v1/namespaces/{namespace}/pods/{pod}/logs/follow", s.needsCache(s.followLogs))
+	mux.HandleFunc("GET /api/v1/services/logs", s.needsCache(s.serviceLogs))
+	mux.HandleFunc("GET /api/v1/services/logs/follow", s.needsCache(s.followServiceLogs))
+
 	s.actionRoutes(mux)
 	s.aiRoutes(mux)
 	s.auth.Routes(mux)

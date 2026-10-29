@@ -109,23 +109,9 @@ func (s *Server) followLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) logRequest(w http.ResponseWriter, r *http.Request) (*corev1.Pod, cluster.LogRequest, bool) {
-	q := r.URL.Query()
-	req := cluster.LogRequest{Container: q.Get("container"), Previous: q.Get("previous") == "true", TailLines: 500}
-	if v := q.Get("tailLines"); v != "" {
-		n, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || n < 1 || n > 10000 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "tailLines must be 1–10000"})
-			return nil, req, false
-		}
-		req.TailLines = n
-	}
-	if v := q.Get("sinceTime"); v != "" {
-		t, err := time.Parse(time.RFC3339Nano, v)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "sinceTime must be RFC 3339"})
-			return nil, req, false
-		}
-		req.SinceTime = &t
+	req, ok := parseLogRequest(w, r)
+	if !ok {
+		return nil, req, false
 	}
 	pod, err := s.cache.Pod(r.PathValue("namespace"), r.PathValue("pod"))
 	if err != nil {
@@ -133,6 +119,28 @@ func (s *Server) logRequest(w http.ResponseWriter, r *http.Request) (*corev1.Pod
 		return nil, req, false
 	}
 	return pod, req, true
+}
+
+func parseLogRequest(w http.ResponseWriter, r *http.Request) (cluster.LogRequest, bool) {
+	q := r.URL.Query()
+	req := cluster.LogRequest{Container: q.Get("container"), Previous: q.Get("previous") == "true", TailLines: 500}
+	if v := q.Get("tailLines"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 1 || n > 10000 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "tailLines must be 1–10000"})
+			return req, false
+		}
+		req.TailLines = n
+	}
+	if v := q.Get("sinceTime"); v != "" {
+		t, err := time.Parse(time.RFC3339Nano, v)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "sinceTime must be RFC 3339"})
+			return req, false
+		}
+		req.SinceTime = &t
+	}
+	return req, true
 }
 
 func (s *Server) logError(w http.ResponseWriter, err error) {

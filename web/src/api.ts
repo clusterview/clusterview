@@ -192,6 +192,9 @@ export interface Nodes {
 }
 
 export interface LogLine {
+  namespace?: string;
+  pod?: string;
+  container?: string;
   timestamp?: string;
   text: string;
 }
@@ -204,6 +207,27 @@ export interface PodLogs {
   previous: boolean;
   lines: LogLine[];
   notice?: string;
+}
+
+export interface ServiceLogs {
+  sources: { namespace: string; pod: string; container: string }[];
+  containers: string[];
+  totalSources: number;
+  lines: LogLine[];
+  notices: string[];
+}
+
+export function getServiceLogs(serviceId: string, container: string, previous: boolean) {
+  const q = new URLSearchParams({ serviceId, tailLines: "500" });
+  if (container) q.set("container", container);
+  if (previous) q.set("previous", "true");
+  return getJSON<ServiceLogs>(`api/v1/services/logs?${q}`);
+}
+
+export function followServiceLogsURL(serviceId: string, container: string) {
+  const q = new URLSearchParams({ serviceId, tailLines: "500" });
+  if (container) q.set("container", container);
+  return `api/v1/services/logs/follow?${q}`;
 }
 
 async function getJSON<T>(path: string): Promise<T> {

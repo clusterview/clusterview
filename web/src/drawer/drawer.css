@@ -731,3 +731,12 @@
 .cv-nowrap {
   white-space: nowrap;
 }
+
+/* Service-wide logs keep the source visible without squeezing out messages. */
+.cv-all-logs { margin-left: auto; text-transform: none; letter-spacing: normal; }
+.cv-logs-bar { flex-wrap: wrap; }
+.cv-logs-bar select { min-width: 0; max-width: 100%; }
+.cv-log-source { color: #a3b6d2; user-select: all; flex: none; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-logs-help { margin: 0; }
+
+.cv-pods-heading { display: flex; align-items: center; }

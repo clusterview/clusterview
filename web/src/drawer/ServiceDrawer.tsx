@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Globe, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Globe, ScrollText, X } from "lucide-react";
 import type { ActionsConfig, AIInfo, Me, PodState, Problem, Service, Snapshot, Workload } from "../api";
 import { CategoryIcon, categoryLabel } from "../components/CategoryIcon";
 import { PodPips, toneOf } from "../components/ServiceCard";
@@ -126,8 +126,11 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
 
             {pods.length > 0 && (
               <section className="cv-section">
-                <h3>
+                <h3 className="cv-pods-heading">
                   Pods <span className="cv-count">{pods.length}</span>
+                  <button className="cv-btn is-ghost is-sm cv-all-logs" onClick={() => { setLogsPod(null); setTab("logs"); }}>
+                    <ScrollText size={14} /> All logs
+                  </button>
                 </h3>
                 <ul className="cv-pods">
                   {pods.map((p) => (
@@ -170,7 +173,7 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
           </>
         )}
 
-        {tab === "logs" && <LogsTab pods={pods} initialPod={logsPod ?? pickLogPod(pods)} />}
+        {tab === "logs" && <LogsTab key={s.id} serviceId={s.id} pods={pods} initialPod={logsPod} />}
 
         {tab === "events" &&
           (events.length === 0 ? (
@@ -194,11 +197,6 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
       </div>
     </aside>
   );
-}
-
-/** The pod whose logs most likely explain the service: a stuck one first. */
-function pickLogPod(pods: PodState[]) {
-  return (pods.find((p) => p.stuck) ?? pods.find((p) => !p.ready) ?? pods[0])?.name ?? null;
 }
 
 function ProblemCard({ problem: p, onLogs }: { problem: Problem; onLogs: (pod: string) => void }) {
