@@ -57,7 +57,12 @@ auth:
   #   password  one shared password from auth.existingSecret (key password),
   #          like Grafana's built-in login. Nobody is told apart, so keep
   #          actions off or limit operators.
+  # With mode none, the chart refuses to put the dashboard on the network (an
+  # ingress, or a LoadBalancer or NodePort Service): anyone who found it could
+  # read every pod's logs. Set this only when something else already keeps
+  # strangers out, such as a VPN, an IP allowlist or a login at the ingress.
   mode: none
+  allowNoAuthWhenExposed: false
   # Who may look, and who may also act. Entries: a user (email), group:<name>,
   # *@<domain>, or *. Empty viewers: anyone signed in. Empty operators: nobody
   # (in modes proxy and oidc).

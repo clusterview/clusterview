@@ -106,8 +106,15 @@ jobs:
       - name: Validate rendered manifests
         run: |
           helm template t charts/clusterview | kubeconform -strict -summary
-          helm template t charts/clusterview --set ingress.enabled=true --set networkPolicy.enabled=true | kubeconform -strict -summary
-          helm template t charts/clusterview --set ingress.enabled=true --set basePath=/clusterview | kubeconform -strict -summary
+          helm template t charts/clusterview --set ingress.enabled=true --set networkPolicy.enabled=true --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
+          helm template t charts/clusterview --set ingress.enabled=true --set basePath=/clusterview --set auth.mode=oidc --set auth.oidc.issuerURL=https://id.example.com --set auth.oidc.clientID=cv --set auth.oidc.redirectURL=https://apps.example.com/clusterview/auth/callback | kubeconform -strict -summary
+          helm template t charts/clusterview --set ingress.enabled=true --set auth.allowNoAuthWhenExposed=true | kubeconform -strict -summary
+          for exposed in "ingress.enabled=true" "service.type=LoadBalancer" "service.type=NodePort"; do
+            if helm template t charts/clusterview --set "$exposed" > /dev/null 2>&1; then
+              echo "$exposed accepted with no sign-in"
+              exit 1
+            fi
+          done
           helm template t charts/clusterview --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary

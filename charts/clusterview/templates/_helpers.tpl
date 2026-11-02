@@ -33,6 +33,23 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Stops the install when the dashboard would be on the network with no
+sign-in: anyone who found it could read every pod's logs, and act if actions
+are on. kubectl port-forward needs no sign-in, since only people with cluster
+access can use it.
+*/}}
+{{- define "clusterview.checkAuth" -}}
+{{- if and (eq .Values.auth.mode "none") (not .Values.auth.allowNoAuthWhenExposed) }}
+{{- $exposed := "" }}
+{{- if .Values.ingress.enabled }}{{ $exposed = "an ingress" }}{{ end }}
+{{- if has .Values.service.type (list "LoadBalancer" "NodePort") }}{{ $exposed = printf "a %s Service" .Values.service.type }}{{ end }}
+{{- with $exposed }}
+{{- fail (printf "auth.mode is none, but %s puts the dashboard on the network, where anyone who finds it could read every pod's logs. Pick a sign-in (auth.mode=password, oidc or proxy), or set auth.allowNoAuthWhenExposed=true if a VPN, IP allowlist or ingress login already keeps strangers out." .) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
 The base path as the binary uses it: "/clusterview", or "" at the root.
 */}}
 {{- define "clusterview.basePath" -}}
