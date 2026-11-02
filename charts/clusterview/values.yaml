@@ -33,10 +33,16 @@ actions:
   # now. Off by default; when on, the chart grants only those rights (no
   # deletes of workloads, no Secrets, no exec), and every action is logged.
   enabled: false
-  # Limit actions to these namespaces. Empty means every watched namespace.
+  # The namespaces actions may touch, and the only ones the chart grants
+  # these rights in. Required with actions on (empty: scope.namespaces); never
+  # kube-system, kube-public or kube-node-lease.
   namespaces: []
   # The most replicas scaling may set.
   maxReplicas: 20
+  # A ValidatingAdmissionPolicy that lets clusterview's service account only
+  # restart and scale, so a stolen token can't change images or commands.
+  # Needs Kubernetes 1.30 or later; turn off only on older clusters.
+  admissionPolicy: true
 
 auth:
   # How people sign in:

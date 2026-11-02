@@ -207,11 +207,13 @@ func (r *Runner) Scale(ctx context.Context, actor, kind, ns, name string, replic
 			}
 			from, uid = ptrOr(s.Spec.Replicas, 1), s.UID
 		}
+		// Through the scale subresource, which can change nothing but the
+		// replica count; the chart grants only that for scaling.
 		patch := []byte(`{"spec":{"replicas":` + strconv.Itoa(replicas) + `}}`)
 		if kind == "Deployment" {
-			_, err = apps.Deployments(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err = apps.Deployments(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
 		} else {
-			_, err = apps.StatefulSets(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err = apps.StatefulSets(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
 		}
 		return fmt.Sprintf("from %d to %d replicas", from, replicas), corev1.ObjectReference{APIVersion: "apps/v1", Kind: kind, Namespace: ns, Name: name, UID: uid}, err
 	})

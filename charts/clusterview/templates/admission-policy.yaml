@@ -1,0 +1,115 @@
+{{- if and .Values.actions.enabled .Values.actions.admissionPolicy }}
+{{- /*
+RBAC says which objects clusterview may change, not how. This policy holds
+every write clusterview's service account makes to what its actions do, so
+someone who stole the token (a bug in clusterview, a compromised node) can
+restart and scale, but not run their own code:
+
+  - a workload patch may only change the restart annotations
+  - scaling may not go over actions.maxReplicas
+  - a deleted pod must have an owner that replaces it
+  - a new Job must belong to a CronJob and can't ask for privileged mode,
+    host namespaces, host paths or added capabilities
+
+Kubernetes can't compare a new Job with its CronJob, so a stolen token could
+still start a Job of its own making in an action namespace, without those
+host-level rights. Keep actions.namespaces to the namespaces people need.
+*/}}
+{{- $fullname := include "clusterview.fullname" . }}
+{{- $user := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "clusterview.serviceAccountName" .) }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $fullname }}-actions
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["*"]
+        operations: ["UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets", "deployments/scale", "statefulsets/scale"]
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: ["DELETE"]
+        resources: ["pods"]
+      - apiGroups: ["batch"]
+        apiVersions: ["*"]
+        operations: ["CREATE"]
+        resources: ["jobs"]
+  matchConditions:
+    - name: clusterview
+      expression: request.userInfo.username == {{ $user | quote }}
+  variables:
+    - name: target
+      expression: "has(request.subResource) && request.subResource != '' ? request.resource.resource + '/' + request.subResource : request.resource.resource"
+    - name: restartKeys
+      expression: "['kubectl.kubernetes.io/restartedAt', 'clusterview.io/restarted-by']"
+    # Pod templates and their metadata, empty where a field isn't set.
+    - name: tmpl
+      expression: "variables.target in ['deployments', 'statefulsets', 'daemonsets'] ? object.spec.template : {}"
+    - name: oldTmpl
+      expression: "variables.target in ['deployments', 'statefulsets', 'daemonsets'] ? oldObject.spec.template : {}"
+    - name: annotations
+      expression: "has(variables.tmpl.metadata) && has(variables.tmpl.metadata.annotations) ? variables.tmpl.metadata.annotations : {}"
+    - name: oldAnnotations
+      expression: "has(variables.oldTmpl.metadata) && has(variables.oldTmpl.metadata.annotations) ? variables.oldTmpl.metadata.annotations : {}"
+    - name: jobPod
+      expression: "variables.target == 'jobs' ? object.spec.template.spec : {}"
+  validations:
+    # Rolling restart: the pod template, replicas and owners stay as they were;
+    # only the two restart annotations may change.
+    - expression: >-
+        !(variables.target in ['deployments', 'statefulsets', 'daemonsets']) || (
+          variables.tmpl.spec == variables.oldTmpl.spec &&
+          (has(variables.tmpl.metadata) && has(variables.tmpl.metadata.labels) ? variables.tmpl.metadata.labels : {}) ==
+            (has(variables.oldTmpl.metadata) && has(variables.oldTmpl.metadata.labels) ? variables.oldTmpl.metadata.labels : {}) &&
+          variables.annotations.all(k, k in variables.restartKeys || (k in variables.oldAnnotations && variables.oldAnnotations[k] == variables.annotations[k])) &&
+          variables.oldAnnotations.all(k, k in variables.restartKeys || k in variables.annotations) &&
+          (has(object.spec.replicas) ? object.spec.replicas : -1) == (has(oldObject.spec.replicas) ? oldObject.spec.replicas : -1) &&
+          (has(object.metadata.ownerReferences) ? object.metadata.ownerReferences : []) == (has(oldObject.metadata.ownerReferences) ? oldObject.metadata.ownerReferences : []) &&
+          (has(object.metadata.finalizers) ? object.metadata.finalizers : []) == (has(oldObject.metadata.finalizers) ? oldObject.metadata.finalizers : [])
+        )
+      message: clusterview may only restart a workload (its restart annotations), not change it.
+    - expression: >-
+        !(variables.target in ['deployments/scale', 'statefulsets/scale']) ||
+        !has(object.spec) || !has(object.spec.replicas) || object.spec.replicas <= {{ .Values.actions.maxReplicas | int }}
+      message: clusterview may not scale above actions.maxReplicas ({{ .Values.actions.maxReplicas | int }}).
+    - expression: >-
+        variables.target != 'pods' || (
+          has(oldObject.metadata.ownerReferences) &&
+          oldObject.metadata.ownerReferences.exists(r, has(r.controller) && r.controller && r.kind != 'Node')
+        )
+      message: clusterview may only delete a pod that something replaces.
+    - expression: >-
+        variables.target != 'jobs' || (
+          has(object.metadata.ownerReferences) &&
+          object.metadata.ownerReferences.exists(r, r.apiVersion == 'batch/v1' && r.kind == 'CronJob' && has(r.controller) && r.controller)
+        )
+      message: clusterview may only start a Job from a CronJob.
+    - expression: >-
+        variables.target != 'jobs' || (
+          !(has(variables.jobPod.hostNetwork) && variables.jobPod.hostNetwork) &&
+          !(has(variables.jobPod.hostPID) && variables.jobPod.hostPID) &&
+          !(has(variables.jobPod.hostIPC) && variables.jobPod.hostIPC) &&
+          (!has(variables.jobPod.volumes) || variables.jobPod.volumes.all(v, !has(v.hostPath))) &&
+          (variables.jobPod.containers + (has(variables.jobPod.initContainers) ? variables.jobPod.initContainers : [])).all(c,
+            !has(c.securityContext) || (
+              !(has(c.securityContext.privileged) && c.securityContext.privileged) &&
+              !(has(c.securityContext.capabilities) && has(c.securityContext.capabilities.add) && size(c.securityContext.capabilities.add) > 0)
+            ))
+        )
+      message: clusterview won't start a Job that asks for privileged mode, host namespaces, host paths or added capabilities. Run this CronJob with kubectl.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $fullname }}-actions
+  labels:
+    {{- include "clusterview.labels" . | nindent 4 }}
+spec:
+  policyName: {{ $fullname }}-actions
+  validationActions: [Deny]
+{{- end }}

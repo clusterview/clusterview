@@ -131,6 +131,12 @@ func TestScale(t *testing.T) {
 	if d, _ := cs.AppsV1().Deployments("shop").Get(ctx, "api", metav1.GetOptions{}); *d.Spec.Replicas != 4 {
 		t.Errorf("replicas %d", *d.Spec.Replicas)
 	}
+	// Only the scale subresource: the chart grants nothing else for scaling.
+	for _, a := range cs.Actions() {
+		if a.GetVerb() == "patch" && a.GetSubresource() != "scale" {
+			t.Errorf("scaled with a patch to %s/%q, want the scale subresource", a.GetResource().Resource, a.GetSubresource())
+		}
+	}
 	var refused Refused
 	if _, err := r.Scale(ctx, "ann", "Deployment", "shop", "api", 6); !errors.As(err, &refused) {
 		t.Errorf("over the limit: %v", err)

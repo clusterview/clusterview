@@ -111,6 +111,7 @@ jobs:
           helm template t charts/clusterview --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
+          helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop,payments}' | kubeconform -strict -summary
       - name: Reject incomplete alert settings
         run: |
           if helm template t charts/clusterview --set alerts.enabled=true > /dev/null 2>&1; then
@@ -121,6 +122,21 @@ jobs:
             echo "unknown alert format accepted"
             exit 1
           fi
+      - name: Reject actions that reach too far
+        run: |
+          if helm template t charts/clusterview --set actions.enabled=true > /dev/null 2>&1; then
+            echo "actions accepted without namespaces"
+            exit 1
+          fi
+          if helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop,kube-system}' > /dev/null 2>&1; then
+            echo "actions accepted in kube-system"
+            exit 1
+          fi
+          if helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop}' --kube-version 1.29.0 > /dev/null 2>&1; then
+            echo "admission policy accepted on a cluster without ValidatingAdmissionPolicy"
+            exit 1
+          fi
+          helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop}' --kube-version 1.29.0 --set actions.admissionPolicy=false > /dev/null
 
   # Builds every laptop binary and archive the way a release does, without
   # publishing, so a release can't fail on something a PR could have caught.
@@ -258,7 +274,8 @@ jobs:
           test "$(kubectl auth can-i create pods/exec -A --as=$sa)" = no
       - name: Actions, once switched on
         run: |
-          helm upgrade clusterview charts/clusterview -n clusterview --reuse-values --set actions.enabled=true --wait --timeout 3m
+          helm upgrade clusterview charts/clusterview -n clusterview --reuse-values \
+            --set actions.enabled=true --set 'actions.namespaces={default}' --wait --timeout 3m
           kubectl -n clusterview rollout status deploy/clusterview --timeout=2m
           kubectl -n clusterview port-forward svc/clusterview 8081:8080 &
           for _ in $(seq 1 20); do curl -sf localhost:8081/readyz && break; sleep 1; done
@@ -267,11 +284,31 @@ jobs:
           kubectl -n default get deploy probe -o jsonpath='{.spec.template.metadata.annotations.clusterview\.io/restarted-by}' | grep -q anonymous
           curl -sf localhost:8081/api/v1/audit | jq -e '.[0].target == "Deployment/default/probe"'
           kubectl -n default get events --field-selector reason=ClusterviewAction -o name | grep -q .
+          curl -sf -X POST -H 'X-Clusterview-Action: 1' -d '{"replicas":1}' localhost:8081/api/v1/workloads/Deployment/default/probe/scale | jq -e '.ok == true'
           sa=system:serviceaccount:clusterview:clusterview
-          test "$(kubectl auth can-i patch deployments -A --as=$sa)" = yes
+          test "$(kubectl auth can-i patch deployments -n default --as=$sa)" = yes
+          test "$(kubectl auth can-i patch deployments -n kube-system --as=$sa)" = no
+          test "$(kubectl auth can-i create jobs -n kube-system --as=$sa)" = no
           test "$(kubectl auth can-i delete deployments -A --as=$sa)" = no
           test "$(kubectl auth can-i get secrets -A --as=$sa)" = no
           test "$(kubectl auth can-i create pods/exec -A --as=$sa)" = no
+      - name: A stolen token can restart and scale, nothing more
+        run: |
+          sa=system:serviceaccount:clusterview:clusterview
+          kubectl -n default rollout restart deploy/probe --as=$sa
+          kubectl -n default scale deploy/probe --replicas=2 --as=$sa
+          if kubectl -n default set image deploy/probe '*=busybox:1.36' --as=$sa; then
+            echo "the service account changed an image"
+            exit 1
+          fi
+          if kubectl -n default scale deploy/probe --replicas=50 --as=$sa; then
+            echo "the service account scaled past actions.maxReplicas"
+            exit 1
+          fi
+          if kubectl -n default create job stray --image=busybox:1.36 --as=$sa; then
+            echo "the service account started a Job no CronJob owns"
+            exit 1
+          fi
       - name: Served under a path
         run: |
           helm upgrade clusterview charts/clusterview -n clusterview --reuse-values --set basePath=/clusterview --wait --timeout 3m

@@ -61,7 +61,8 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "namespaces": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "maxReplicas": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        "maxReplicas": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "admissionPolicy": { "type": "boolean" }
       }
     },
     "auth": {

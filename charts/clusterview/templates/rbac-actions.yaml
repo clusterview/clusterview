@@ -1,45 +1,29 @@
 {{- if and .Values.rbac.create .Values.actions.enabled }}
 {{- /*
 The rights actions need, and nothing more: delete a pod (restart), patch a
-Deployment/StatefulSet/DaemonSet (rolling restart, scale), read autoscalers
-and CronJobs, create a Job from a CronJob, and write an Event recording who
-did what. A ClusterRole when actions apply everywhere; a Role per namespace
-when actions.namespaces (or scope.namespaces) lists them.
+Deployment/StatefulSet/DaemonSet (rolling restart), patch the scale
+subresource of a Deployment/StatefulSet (scale), read autoscalers and
+CronJobs, create a Job from a CronJob, and write an Event recording who did
+what. Always a Role per listed namespace: Kubernetes can't limit what a patch
+or a new Job contains, so these rights are never granted cluster-wide.
+admission-policy.yaml then holds each request to what the action needs.
+
+cronjobs/finalizers: the Job names its CronJob as owner with
+blockOwnerDeletion, which clusters running the OwnerReferencesPermissionEnforcement
+admission plugin (EKS, OpenShift) only allow with update on it. There is no
+such endpoint to call; it's a permission check only.
 */}}
 {{- $rules := list
   (dict "apiGroups" (list "") "resources" (list "pods") "verbs" (list "get" "delete"))
   (dict "apiGroups" (list "apps") "resources" (list "deployments" "statefulsets" "daemonsets") "verbs" (list "get" "patch"))
+  (dict "apiGroups" (list "apps") "resources" (list "deployments/scale" "statefulsets/scale") "verbs" (list "get" "patch"))
   (dict "apiGroups" (list "autoscaling") "resources" (list "horizontalpodautoscalers") "verbs" (list "list"))
   (dict "apiGroups" (list "batch") "resources" (list "cronjobs") "verbs" (list "get"))
+  (dict "apiGroups" (list "batch") "resources" (list "cronjobs/finalizers") "verbs" (list "update"))
   (dict "apiGroups" (list "batch") "resources" (list "jobs") "verbs" (list "create"))
   (dict "apiGroups" (list "") "resources" (list "events") "verbs" (list "create"))
 }}
 {{- $actionNamespaces := .Values.actions.namespaces | default .Values.scope.namespaces }}
-{{- if empty $actionNamespaces }}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: {{ include "clusterview.fullname" . }}-operator
-  labels:
-    {{- include "clusterview.labels" . | nindent 4 }}
-rules:
-  {{- toYaml $rules | nindent 2 }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ include "clusterview.fullname" . }}-operator
-  labels:
-    {{- include "clusterview.labels" . | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ include "clusterview.fullname" . }}-operator
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "clusterview.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
-{{- else }}
 {{- range $ns := $actionNamespaces }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -67,6 +51,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "clusterview.serviceAccountName" $ }}
     namespace: {{ $.Release.Namespace }}
-{{- end }}
 {{- end }}
 {{- end }}

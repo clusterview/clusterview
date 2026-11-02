@@ -95,7 +95,9 @@ A values switch, `actions.enabled`, adds a second, narrow role. It grants:
 - patch Deployments and StatefulSets (rolling restart, scale within a limit)
 - create Jobs from a CronJob (rerun)
 
-An optional `actions.namespaces` list limits where actions apply. The chart
+A required `actions.namespaces` list limits where actions apply (never the
+system namespaces), and a ValidatingAdmissionPolicy holds the service account
+to what each action needs. The chart
 ships `values.schema.json` so bad settings fail at install, and the chart is
 tested on a real cluster (kind) in CI.
 

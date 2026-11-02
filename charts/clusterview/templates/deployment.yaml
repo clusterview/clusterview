@@ -1,3 +1,4 @@
+{{- include "clusterview.checkActions" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -50,7 +51,7 @@ spec:
             - name: CLUSTERVIEW_ACTIONS
               value: {{ .Values.actions.enabled | quote }}
             - name: CLUSTERVIEW_ACTIONS_NAMESPACES
-              value: {{ join "," (.Values.actions.namespaces | default .Values.scope.namespaces) | quote }}
+              value: {{ include "clusterview.actionNamespaces" . | quote }}
             - name: CLUSTERVIEW_ACTIONS_MAX_REPLICAS
               value: {{ .Values.actions.maxReplicas | quote }}
             - name: CLUSTERVIEW_AUTH
