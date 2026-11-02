@@ -168,6 +168,12 @@ could read every pod's logs. Pick a sign-in first. If something else already
 keeps strangers out, such as a VPN, an IP allowlist or a login at the ingress,
 set `auth.allowNoAuthWhenExposed=true`.
 
+Every response carries browser security headers: a Content-Security-Policy
+that only lets the page load from the dashboard itself, `frame-ancestors
+'none'` and `X-Frame-Options: DENY` (no other site can frame it), `nosniff`
+and `Referrer-Policy: no-referrer`. HSTS is left to the ingress that
+terminates TLS.
+
 OIDC example:
 
 ```bash
