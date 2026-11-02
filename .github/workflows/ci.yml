@@ -111,6 +111,7 @@ jobs:
           helm template t charts/clusterview --set auth.mode=password --set auth.existingSecret=auth | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
+          helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop,payments}' | kubeconform -strict -summary
       - name: Reject incomplete alert settings
         run: |
           if helm template t charts/clusterview --set alerts.enabled=true > /dev/null 2>&1; then
@@ -121,6 +122,21 @@ jobs:
             echo "unknown alert format accepted"
             exit 1
           fi
+      - name: Reject actions that reach too far
+        run: |
+          if helm template t charts/clusterview --set actions.enabled=true > /dev/null 2>&1; then
+            echo "actions accepted without namespaces"
+            exit 1
+          fi
+          if helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop,kube-system}' > /dev/null 2>&1; then
+            echo "actions accepted in kube-system"
+            exit 1
+          fi
+          if helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop}' --kube-version 1.29.0 > /dev/null 2>&1; then
+            echo "admission policy accepted on a cluster without ValidatingAdmissionPolicy"
+            exit 1
+          fi
+          helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop}' --kube-version 1.29.0 --set actions.admissionPolicy=false > /dev/null
 
   # Builds every laptop binary and archive the way a release does, without
   # publishing, so a release can't fail on something a PR could have caught.

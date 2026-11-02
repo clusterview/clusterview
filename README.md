@@ -106,12 +106,13 @@ pods, or change anything. See
 
 ### Actions
 
-Off by default. Switch them on to restart pods, restart and scale workloads,
-and run CronJobs now:
+Off by default. Switch them on, naming the namespaces whose workloads people
+may restart and scale, to restart pods, restart and scale workloads, and run
+CronJobs now:
 
 ```bash
 helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview \
-  --reuse-values --set actions.enabled=true
+  --reuse-values --set actions.enabled=true --set 'actions.namespaces={shop,payments}'
 ```
 
 | Action | What it does | Refused when |
@@ -119,13 +120,25 @@ helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n cluster
 | Restart pod | Deletes the pod so its owner replaces it | Nothing owns the pod, or it's a static pod |
 | Restart | Rolling restart of a Deployment, StatefulSet or DaemonSet, like `kubectl rollout restart` | The Deployment is paused |
 | Scale | Sets a Deployment's or StatefulSet's replicas | An autoscaler owns the count, or it's over `actions.maxReplicas` (20) |
-| Run now | Starts a Job from a CronJob, like `kubectl create job --from` | — |
+| Run now | Starts a Job from a CronJob, like `kubectl create job --from` | The Job would ask for privileged mode, host namespaces, host paths or added capabilities |
 
-The chart then adds only those rights: get/delete pods, get/patch
-Deployments, StatefulSets and DaemonSets, list autoscalers, get CronJobs,
-create Jobs and Events. It never grants deleting workloads, Secrets or exec.
-`actions.namespaces` limits actions (and the chart's grants) to a list of
-namespaces.
+The chart then adds only those rights, in a Role in each listed namespace:
+get/delete pods, get/patch Deployments, StatefulSets and DaemonSets, patch
+their scale, list autoscalers, get CronJobs, create Jobs and Events. It never
+grants deleting workloads, Secrets or exec, and never grants actions
+cluster-wide: `actions.namespaces` (or `scope.namespaces`) is required, and
+`kube-system`, `kube-public` and `kube-node-lease` are refused.
+
+RBAC can't say *how* an object may change, so the chart also installs a
+ValidatingAdmissionPolicy (Kubernetes 1.30+) that holds clusterview's service
+account to what the actions do. Someone who stole its token could restart and
+scale, but not change an image or command, add an owner that deletes the
+workload, delete an unowned pod, scale past `actions.maxReplicas`, or start a
+Job that isn't a CronJob's or that asks for host access. Kubernetes can't
+compare a new Job with its CronJob, so a stolen token could still start a Job
+of its own (without host access) in a listed namespace: list only the
+namespaces people need. On older clusters, set `actions.admissionPolicy=false`
+to install without the policy.
 
 Every action, refused or failed ones included, goes to the **audit log**: the
 process log as JSON, `GET /api/v1/audit` (the last 500), and a
