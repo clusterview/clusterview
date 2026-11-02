@@ -85,7 +85,8 @@
             "groupsClaim": { "type": "string" }
           }
         },
-        "existingSecret": { "type": "string" }
+        "existingSecret": { "type": "string" },
+        "allowNoAuthWhenExposed": { "type": "boolean" }
       }
     },
     "service": {

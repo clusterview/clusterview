@@ -86,10 +86,12 @@ at `/grafana`, set `basePath`:
 ```bash
 helm upgrade clusterview oci://ghcr.io/clusterview/charts/clusterview -n clusterview --reuse-values \
   --set basePath=/clusterview \
-  --set ingress.enabled=true --set 'ingress.hosts[0].host=apps.example.com'
+  --set ingress.enabled=true --set 'ingress.hosts[0].host=apps.example.com' \
+  --set auth.mode=password --set auth.existingSecret=clusterview-auth
 ```
 
-The dashboard is then at `https://apps.example.com/clusterview/`. With the
+An ingress needs a sign-in (see [Sign-in and roles](#sign-in-and-roles)); here
+the shared password from the `clusterview-auth` Secret. The dashboard is then at `https://apps.example.com/clusterview/`. With the
 chart's ingress, a `/` path becomes `/clusterview`; with your own ingress, route
 `/clusterview` to the `clusterview` Service without rewriting the path. Sign-in
 cookies stay under that path, and the health checks still answer at `/healthz`
@@ -159,6 +161,12 @@ browser won't send cross-site.
 (`ann@example.com`), `group:<name>`, `*@<domain>` or `*`. An empty viewers
 list lets anyone signed in look; an empty operators list lets nobody act
 (except in mode `none`). Actions record the signed-in person in the audit log.
+
+With mode `none`, the chart refuses to put the dashboard on the network (an
+ingress, or a `LoadBalancer` or `NodePort` Service), since anyone who found it
+could read every pod's logs. Pick a sign-in first. If something else already
+keeps strangers out, such as a VPN, an IP allowlist or a login at the ingress,
+set `auth.allowNoAuthWhenExposed=true`.
 
 OIDC example:
 
