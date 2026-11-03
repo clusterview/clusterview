@@ -6,6 +6,10 @@ Please don't open a public issue. Report it privately on GitHub instead:
 [**Report a vulnerability**](https://github.com/clusterview/clusterview/security/advisories/new)
 (the repository's Security tab).
 
+If that form isn't available, open an issue titled "Security contact
+request" with no details of the problem, and we'll reach out to set up a
+private channel.
+
 Include what you found, the version (`/api/v1/version` or the chart
 version), how to reproduce it, and what someone could do with it. We'll
 reply there, work on a fix in a private advisory, and credit you when it's
