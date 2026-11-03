@@ -44,6 +44,29 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
+func TestSecurityHeaders(t *testing.T) {
+	srv := newTestServer(nil)
+	defer srv.Close()
+	// The UI, the API, a missing route and the health check all carry them.
+	for _, path := range []string{"/", "/api/v1/version", "/api/v1/nope", "/healthz"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		for name, want := range map[string]string{
+			"Content-Security-Policy": contentSecurityPolicy,
+			"X-Frame-Options":         "DENY",
+			"X-Content-Type-Options":  "nosniff",
+			"Referrer-Policy":         "no-referrer",
+		} {
+			if got := resp.Header.Get(name); got != want {
+				t.Errorf("%s: %s = %q, want %q", path, name, got, want)
+			}
+		}
+	}
+}
+
 func TestClusterConnected(t *testing.T) {
 	cs := fake.NewClientset()
 	cs.Discovery().(*fakediscovery.FakeDiscovery).FakedServerVersion = &version.Info{GitVersion: "v1.34.0"}

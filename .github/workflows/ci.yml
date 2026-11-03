@@ -38,6 +38,10 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+      # Fails when the code calls a dependency (or Go itself) with a known
+      # vulnerability; ones in code that's never called only get listed.
+      - name: Known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - uses: actions/cache/save@v6
         if: github.ref == 'refs/heads/main'
         with:

@@ -73,7 +73,29 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})
 	mux.Handle("/", spa(s.ui))
-	return underPath(s.basePath, s.auth.Middleware(mux))
+	return securityHeaders(underPath(s.basePath, s.auth.Middleware(mux)))
+}
+
+// contentSecurityPolicy lets pages load scripts, styles, fonts and data only
+// from the dashboard itself, and no other site frame it. Styles allow inline
+// ones for the sign-in pages; the UI's build has no inline scripts.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; " +
+	"base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+// securityHeaders asks the browser to refuse what the dashboard never does:
+// run scripts from elsewhere, be framed by another site (clickjacking),
+// guess content types, or tell other sites which page a link came from.
+func securityHeaders(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hdr := w.Header()
+		hdr.Set("Content-Security-Policy", contentSecurityPolicy)
+		hdr.Set("X-Frame-Options", "DENY")
+		hdr.Set("X-Content-Type-Options", "nosniff")
+		hdr.Set("Referrer-Policy", "no-referrer")
+		hdr.Set("Cross-Origin-Opener-Policy", "same-origin")
+		h.ServeHTTP(w, r)
+	})
 }
 
 // underPath serves h under base, removing base from each request so routes
