@@ -76,14 +76,15 @@ type Service struct {
 	Description string `json:"description,omitempty"`
 	// DescriptionSource says where the words came from: "annotation",
 	// "operator" or "image". Empty when nothing describes it yet.
-	DescriptionSource string   `json:"descriptionSource,omitempty"`
-	Category          Category `json:"category"`
-	App               string   `json:"app,omitempty"`
-	ManagedBy         *Owner   `json:"managedBy,omitempty"`
-	Status            Status   `json:"status"`
-	Ready             int      `json:"ready"`
-	Desired           int      `json:"desired"`
-	Workloads         []string `json:"workloads"`
+	DescriptionSource string         `json:"descriptionSource,omitempty"`
+	Category          Category       `json:"category"`
+	App               string         `json:"app,omitempty"`
+	ManagedBy         *Owner         `json:"managedBy,omitempty"`
+	Status            Status         `json:"status"`
+	Ready             int            `json:"ready"`
+	Desired           int            `json:"desired"`
+	Workloads         []string       `json:"workloads"`
+	Health            *ServiceHealth `json:"health,omitempty"`
 	// Problems is every member's problems, critical first.
 	Problems []Problem `json:"problems"`
 	// Addresses are the Kubernetes Services that reach it; Entrypoints the
@@ -217,9 +218,10 @@ type PodState struct {
 	Restarts        int    `json:"restarts"`
 	// Reason is why it isn't running normally: CrashLoopBackOff,
 	// Init:ImagePullBackOff, Unschedulable…
-	Reason    string     `json:"reason,omitempty"`
-	Stuck     bool       `json:"stuck"`
-	StartedAt *time.Time `json:"startedAt,omitempty"`
+	Reason    string            `json:"reason,omitempty"`
+	Stuck     bool              `json:"stuck"`
+	StartedAt *time.Time        `json:"startedAt,omitempty"`
+	Resources []ContainerHealth `json:"resources,omitempty"`
 }
 
 // Nodes is the cluster's machines and what runs on them.

@@ -123,6 +123,15 @@ jobs:
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=slack | kubeconform -strict -summary
           helm template t charts/clusterview --set alerts.enabled=true --set alerts.existingSecret=alerts --set alerts.format=teams --set 'scope.namespaces={shop,payments}' | kubeconform -strict -summary
           helm template t charts/clusterview --set actions.enabled=true --set 'actions.namespaces={shop,payments}' | kubeconform -strict -summary
+      - name: Validate monitoring settings
+        run: |
+          helm template t charts/clusterview --set monitoring.prometheusURL=http://prometheus:9090 --set monitoring.existingSecret=metrics --set monitoring.matchLabels.cluster=production --set 'monitoring.rabbitmq[0].serviceId=StatefulSet/shop/rabbitmq' --set 'monitoring.rabbitmq[0].job=rabbitmq' --set 'monitoring.rabbitmq[0].vhost=/' --set 'monitoring.rabbitmq[0].queue=orders' --set alerts.resourceWarnings=true | kubeconform -strict -summary
+          for invalid in "monitoring.resources.warningPercent=99" "monitoring.rabbitmq[0].queue=orders" "monitoring.resources.criticalPercent=101"; do
+            if helm template t charts/clusterview --set "$invalid" > /dev/null 2>&1; then
+              echo "invalid monitoring setting accepted: $invalid"
+              exit 1
+            fi
+          done
       - name: Reject incomplete alert settings
         run: |
           if helm template t charts/clusterview --set alerts.enabled=true > /dev/null 2>&1; then

@@ -15,6 +15,56 @@ export interface VersionInfo {
 
 export type Status = "healthy" | "idle" | "degraded" | "down" | "unknown";
 
+export type HealthState = "healthy" | "warning" | "critical" | "unknown";
+
+export interface ResourceReading {
+  state: HealthState;
+  usage?: number;
+  limit?: number;
+  percent?: number;
+  unit: "millicores" | "bytes" | "percent";
+  source: string;
+  reason: string;
+  subject?: string;
+  observedAt?: string;
+  history?: { time: string; value: number }[];
+}
+
+export interface ContainerHealth {
+  name: string;
+  cpu: ResourceReading;
+  memory: ResourceReading;
+  throttling?: ResourceReading;
+}
+
+export interface QueueHealth {
+  serviceId: string;
+  job: string;
+  vhost: string;
+  queue: string;
+  state: HealthState;
+  reason: string;
+  ready?: number;
+  unacked?: number;
+  consumers?: number;
+  publishRate?: number;
+  processRate?: number;
+  ackMode: "manual" | "auto";
+  allowNoConsumers: boolean;
+  warningMessages: number;
+  criticalMessages: number;
+  observedAt?: string;
+}
+
+export interface ServiceHealth {
+  state: HealthState;
+  cpu: ResourceReading;
+  memory: ResourceReading;
+  disk?: ResourceReading;
+  queues?: QueueHealth[];
+  checks: Record<string, HealthState>;
+}
+
 export interface PodState {
   name: string;
   namespace: string;
@@ -26,6 +76,7 @@ export interface PodState {
   reason?: string;
   stuck: boolean;
   startedAt?: string;
+  resources?: ContainerHealth[];
 }
 
 export type Category =
@@ -102,6 +153,7 @@ export interface Service {
   ready: number;
   desired: number;
   workloads: string[];
+  health?: ServiceHealth;
   problems: Problem[];
   addresses: Address[];
   entrypoints: Entrypoint[];

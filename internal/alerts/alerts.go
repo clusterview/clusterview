@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/clusterview/clusterview/internal/cluster"
@@ -20,11 +21,12 @@ const pollEvery = 15 * time.Second
 // Config selects one destination. An empty WebhookURL turns alerts off.
 type Config struct {
 	// WebhookURL is a secret: read it from the environment, never a flag.
-	WebhookURL   string
-	Format       string // webhook (structured JSON), slack, or teams
-	For          time.Duration
-	Cluster      string
-	DashboardURL string
+	WebhookURL       string
+	Format           string // webhook (structured JSON), slack, or teams
+	ResourceWarnings bool
+	For              time.Duration
+	Cluster          string
+	DashboardURL     string
 }
 
 // Source is the same scoped view the dashboard uses.
@@ -67,6 +69,7 @@ type Event struct {
 type incident struct {
 	since       time.Time
 	notified    bool
+	checks      map[string]bool
 	failures    int
 	nextAttempt time.Time
 }
@@ -161,10 +164,13 @@ func (m *Monitor) check(ctx context.Context, now time.Time) {
 		}
 		seen[s.ID] = true
 		i := m.incidents[s.ID]
-		if broken(s) {
+		if broken(s) || m.warningIncident(s) {
 			if i == nil {
-				m.incidents[s.ID] = &incident{since: now}
+				m.incidents[s.ID] = &incident{since: now, checks: m.resourceChecks(s)}
 				continue
+			}
+			for key := range m.resourceChecks(s) {
+				i.checks[key] = true
 			}
 			if !i.notified && now.Sub(i.since) >= m.cfg.For && !now.Before(i.nextAttempt) && !now.Before(m.notBefore) {
 				if m.deliver(ctx, m.event(s, i, "firing", now), i) {
@@ -180,7 +186,7 @@ func (m *Monitor) check(ctx context.Context, now time.Time) {
 		// failure window for an incident we haven't notified about yet.
 		if !i.notified {
 			delete(m.incidents, s.ID)
-		} else if (s.Status == cluster.StatusHealthy || s.Status == cluster.StatusIdle) && !now.Before(i.nextAttempt) && !now.Before(m.notBefore) {
+		} else if (s.Status == cluster.StatusHealthy || s.Status == cluster.StatusIdle) && recoveredChecks(s, i.checks) && !now.Before(i.nextAttempt) && !now.Before(m.notBefore) {
 			if m.deliver(ctx, m.event(s, i, "resolved", now), i) {
 				delete(m.incidents, s.ID)
 			}
@@ -232,10 +238,51 @@ func (m *Monitor) event(s cluster.Service, i *incident, state string, now time.T
 		Problems: []Problem{}, StartedAt: i.since, ObservedAt: now, DashboardURL: m.cfg.DashboardURL,
 	}
 	for _, p := range s.Problems {
-		if p.Severity == cluster.SeverityCritical {
+		if p.Severity == cluster.SeverityCritical || (m.cfg.ResourceWarnings && resourceKind(p.Kind)) {
 			e.Problems = append(e.Problems, Problem{Kind: p.Kind, Title: p.Title})
 		}
 	}
 	e.Text = message(e)
 	return e
+}
+
+func resourceKind(kind string) bool {
+	return strings.HasPrefix(kind, "resource-") || strings.HasPrefix(kind, "queue:")
+}
+
+func (m *Monitor) warningIncident(s cluster.Service) bool {
+	if !m.cfg.ResourceWarnings {
+		return false
+	}
+	for _, p := range s.Problems {
+		if resourceKind(p.Kind) && p.Severity == cluster.SeverityWarning {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Monitor) resourceChecks(s cluster.Service) map[string]bool {
+	checks := map[string]bool{}
+	for _, p := range s.Problems {
+		if resourceKind(p.Kind) && (p.Severity == cluster.SeverityCritical || m.cfg.ResourceWarnings) {
+			checks[p.Kind] = true
+		}
+	}
+	return checks
+}
+
+// A pod becoming ready or a metrics source disappearing is not proof that a
+// previously notified resource/queue problem has recovered.
+func recoveredChecks(s cluster.Service, checks map[string]bool) bool {
+	for key := range checks {
+		if s.Health == nil {
+			return false
+		}
+		state, ok := s.Health.Checks[key]
+		if !ok || state == cluster.HealthUnknown {
+			return false
+		}
+	}
+	return true
 }

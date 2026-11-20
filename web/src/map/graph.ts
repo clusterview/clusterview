@@ -1,3 +1,5 @@
+import { needsAttention } from "../health.ts";
+export { needsAttention } from "../health.ts";
 import type { Category, Service, Snapshot } from "../api";
 
 /** Namespaces whose services are all plumbing are tucked away by default. */
@@ -9,9 +11,6 @@ export function isSystemNamespace(ns: string, services: Service[]) {
   return inNs.length > 0 && inNs.every((s) => systemCategories.has(s.category));
 }
 
-export function needsAttention(s: Service) {
-  return s.status === "down" || s.status === "degraded";
-}
 
 export interface MapGraph {
   services: Service[];

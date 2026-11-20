@@ -44,6 +44,29 @@ actions:
   # Needs Kubernetes 1.30 or later; turn off only on older clusters.
   admissionPolicy: true
 
+# CPU/memory use metrics-server automatically. Prometheus adds PVC filesystem
+# usage, CPU throttling, and explicitly selected RabbitMQ queue flow.
+monitoring:
+  prometheusURL: ""
+  # Extra equality labels for a shared/federated Prometheus, e.g. cluster: prod.
+  matchLabels: {}
+  # Optional Secret in this namespace, with a bearerToken key.
+  existingSecret: ""
+  resources:
+    warningPercent: 85
+    criticalPercent: 95
+  # Exact discovered service ID, scrape job, vhost and queue. At most 20.
+  # RabbitMQ's /metrics/detailed must be scraped; see docs/features/resource-health.md.
+  rabbitmq: []
+  # - serviceId: rabbitmq.com/RabbitmqCluster/messaging/events
+  #   job: rabbitmq-production
+  #   vhost: /
+  #   queue: orders
+  #   warningMessages: 1000
+  #   criticalMessages: 10000
+  #   ackMode: manual
+  #   allowNoConsumers: false
+
 auth:
   # How people sign in:
   #   none   no sign-in. Fine with kubectl port-forward, where only people with
@@ -101,6 +124,8 @@ ai:
   describeServices: true
 
 alerts:
+  # Also notify resource/queue warnings after alerts.for. Critical always alerts.
+  resourceWarnings: false
   # Notify when a service stays down, degraded or has a critical problem.
   # One notification per incident, then one when it recovers. No AI needed.
   enabled: false

@@ -2,7 +2,7 @@ import type { ElkNode } from "elkjs/lib/elk.bundled.js";
 import { INTERNET, type MapGraph } from "./graph";
 
 export const CARD_W = 288;
-export const CARD_H = 112;
+export const CARD_H = 168;
 export const INTERNET_W = 132;
 export const INTERNET_H = 44;
 const GROUP_PAD = "[top=44,left=20,bottom=20,right=20]";

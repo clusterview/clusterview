@@ -12,7 +12,7 @@ export async function mockResponse(path: string, body?: { serviceId?: string; me
   const route = "/" + path.split("?")[0].replace(/^\/+/, "");
   switch (route) {
     case "/api/v1/snapshot":
-      return mockName === "kind" ? (await import("./mock/kind.json")).default : (await import("./mock/demo.json")).default;
+      return mockName === "health" ? (await import("./mock/health")).default : mockName === "kind" ? (await import("./mock/kind.json")).default : (await import("./mock/demo.json")).default;
     case "/api/v1/nodes":
       return mockNodes((mockName === "kind" ? (await import("./mock/kind.json")).default : (await import("./mock/demo.json")).default) as unknown as Snapshot);
     case "/api/v1/cluster":
