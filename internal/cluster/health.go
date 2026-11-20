@@ -74,7 +74,16 @@ func worstReading(all []ResourceReading, empty ResourceReading) ResourceReading 
 
 // QueueCheckKey is stable even when queue names contain separators.
 func QueueCheckKey(q QueueTarget) string {
-	return "queue:" + strconv.Quote(q.Job) + ":" + strconv.Quote(q.VHost) + ":" + strconv.Quote(q.Queue)
+	key := "queue:" + strconv.Quote(q.Job) + ":" + strconv.Quote(q.VHost) + ":" + strconv.Quote(q.Queue)
+	keys := make([]string, 0, len(q.BrokerLabels))
+	for label := range q.BrokerLabels {
+		keys = append(keys, label)
+	}
+	slices.Sort(keys)
+	for _, label := range keys {
+		key += ":" + strconv.Quote(label) + "=" + strconv.Quote(q.BrokerLabels[label])
+	}
+	return key
 }
 
 // EvaluateQueue distinguishes a draining burst from stalled or growing work.
@@ -202,10 +211,6 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 					cpu.State = HealthWarning
 					cpu.Reason = "CPU close to its limit"
 				}
-				if throttle != nil && healthRank(throttle.State) > healthRank(cpu.State) {
-					cpu.State = throttle.State
-					cpu.Reason = "CPU is being throttled"
-				}
 				ps.Resources = append(ps.Resources, ContainerHealth{Name: c.Name, CPU: cpu, Memory: mem, Throttling: throttle})
 			}
 		}
@@ -213,7 +218,7 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 	s.Summary.NeedAttention = 0
 	for i := range s.Services {
 		svc := &s.Services[i]
-		var cpus, mems, disks []ResourceReading
+		var cpus, mems, disks, throttles []ResourceReading
 		active := false
 		seenVolumes := map[string]bool{}
 		for _, id := range svc.Workloads {
@@ -226,6 +231,12 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 				for _, c := range ps.Resources {
 					cpus = append(cpus, c.CPU)
 					mems = append(mems, c.Memory)
+					tr := unknownReading("percent", "prometheus", "CPU throttling metrics missing or stale")
+					tr.Subject = ps.Name + "/" + c.Name
+					if c.Throttling != nil {
+						tr = *c.Throttling
+					}
+					throttles = append(throttles, tr)
 				}
 				p := raw[ps.Namespace+"/"+ps.Name]
 				if p == nil {
@@ -263,6 +274,16 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 				key, label string
 				r          ResourceReading
 			}{{"resource-cpu", "CPU", h.CPU}, {"resource-memory", "Memory", h.Memory}}
+			// Usage and throttling are independent evidence. A low usage sample
+			// cannot prove recovery from an incident caused by throttling.
+			throttle := worstReading(throttles, unknownReading("percent", "prometheus", "No current throttling metrics"))
+			h.Checks["resource-cpu-throttling"] = throttle.State
+			if extra.Throttling != nil {
+				resources = append(resources, struct {
+					key, label string
+					r          ResourceReading
+				}{"resource-cpu-throttling", "CPU throttling", throttle})
+			}
 			if h.Disk != nil {
 				resources = append(resources, struct {
 					key, label string
@@ -286,6 +307,21 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 						detail = fmt.Sprintf("%.1f%% of limit/capacity. %s", *r.Percent, detail)
 					}
 					svc.Problems = append(svc.Problems, Problem{Kind: item.key, Severity: sev, Title: item.label + ": " + r.Reason, Detail: detail})
+				}
+			}
+			// Keep the compact CPU meter useful while retaining separate check
+			// identities for alert recovery and independently reported problems.
+			if extra.Throttling != nil && healthRank(throttle.State) > healthRank(h.CPU.State) {
+				for _, cpu := range cpus {
+					if cpu.Subject == throttle.Subject {
+						h.CPU = cpu
+						break
+					}
+				}
+				h.CPU.State = throttle.State
+				h.CPU.Reason = throttle.Reason
+				if throttle.State == HealthWarning || throttle.State == HealthCritical {
+					h.CPU.Reason = "CPU is being throttled"
 				}
 			}
 			for _, q := range extra.Queues {

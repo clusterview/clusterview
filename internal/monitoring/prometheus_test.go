@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -176,5 +177,88 @@ func TestAutoAckQueueUsesDeliveryAndGetRates(t *testing.T) {
 	got := c.Read(context.Background())
 	if got.Queues[0].ProcessRate == nil || *got.Queues[0].ProcessRate != 23 {
 		t.Fatalf("auto-ack processing wrong: %+v", got.Queues[0])
+	}
+}
+
+func TestQueueQueriesIsolateNamespaceAndBrokerBeforeAggregation(t *testing.T) {
+	type broker struct {
+		namespace, service                 string
+		ready, consumers, published, acked float64
+	}
+	for _, tc := range []struct {
+		name       string
+		namespaces []string
+		targets    []cluster.QueueTarget
+		brokers    []broker
+		want       []cluster.HealthState
+	}{
+		{"one watched namespace", []string{"shop"}, []cluster.QueueTarget{{ServiceID: "StatefulSet/shop/events", Job: "rabbitmq", VHost: "/", Queue: "orders"}}, []broker{{"shop", "events", 20, 0, 30, 0}, {"other", "events", 50000, 5, 0, 1000}}, []cluster.HealthState{cluster.HealthCritical}},
+		{"all namespaces", nil, []cluster.QueueTarget{{ServiceID: "StatefulSet/shop/events", Job: "rabbitmq", VHost: "/", Queue: "orders"}, {ServiceID: "StatefulSet/other/events", Job: "rabbitmq", VHost: "/", Queue: "orders"}}, []broker{{"shop", "events", 20, 0, 30, 0}, {"other", "events", 50000, 5, 0, 1000}}, []cluster.HealthState{cluster.HealthCritical, cluster.HealthHealthy}},
+		{"same namespace brokers", []string{"shop"}, []cluster.QueueTarget{{ServiceID: "StatefulSet/shop/events", Job: "rabbitmq", VHost: "/", Queue: "orders", BrokerLabels: map[string]string{"service": `events"a`}}, {ServiceID: "StatefulSet/shop/other", Job: "rabbitmq", VHost: "/", Queue: "orders", BrokerLabels: map[string]string{"service": "events-b"}}}, []broker{{"shop", `events"a`, 20, 0, 30, 0}, {"shop", "events-b", 50000, 5, 0, 1000}}, []cluster.HealthState{cluster.HealthCritical, cluster.HealthHealthy}},
+		{"namespace label absent", []string{"shop"}, []cluster.QueueTarget{{ServiceID: "StatefulSet/shop/events", Job: "rabbitmq", VHost: "/", Queue: "orders"}}, []broker{{"", "events", 20, 0, 30, 0}}, []cluster.HealthState{cluster.HealthUnknown}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				expr := r.URL.Query().Get("query")
+				if !strings.Contains(expr, "rabbitmq_detailed_") {
+					vector(w, "0", nil)
+					return
+				}
+				// Emulate aggregation over matching raw broker series. Missing selectors
+				// deliberately admit foreign series, reproducing the contamination bug.
+				var sum float64
+				matches := 0
+				for _, b := range tc.brokers {
+					if strings.Contains(expr, "namespace=") && !strings.Contains(expr, "namespace="+strconv.Quote(b.namespace)) {
+						continue
+					}
+					if strings.Contains(expr, "service=") && !strings.Contains(expr, "service="+strconv.Quote(b.service)) {
+						continue
+					}
+					matches++
+					switch {
+					case strings.Contains(expr, "queue_messages_ready"):
+						sum += b.ready
+					case strings.Contains(expr, "queue_consumers"):
+						sum += b.consumers
+					case strings.Contains(expr, "messages_published_total"):
+						sum += b.published
+					case strings.Contains(expr, "messages_acked_total"):
+						sum += b.acked
+					}
+				}
+				if matches == 0 {
+					_, _ = fmt.Fprint(w, `{"status":"success","data":{"resultType":"vector","result":[]}}`)
+					return
+				}
+				vector(w, strconv.FormatFloat(sum, 'f', -1, 64), nil)
+			}))
+			defer srv.Close()
+			client, err := New(Config{PrometheusURL: srv.URL, RabbitMQ: tc.targets}, "", tc.namespaces)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := client.Read(context.Background())
+			for i, want := range tc.want {
+				q := cluster.EvaluateQueue(got.Queues[i], time.Now())
+				if q.State != want {
+					t.Fatalf("target %s contaminated: got %s, want %s; %+v", q.ServiceID, q.State, want, q)
+				}
+				if want == cluster.HealthCritical && (q.Ready == nil || *q.Ready != 20 || q.Consumers == nil || *q.Consumers != 0 || q.PublishRate == nil || *q.PublishRate != 30 || q.ProcessRate == nil || *q.ProcessRate != 0) {
+					t.Fatalf("foreign broker measurements included: %+v", q)
+				}
+			}
+		})
+	}
+}
+
+func TestBrokerLabelsCannotOverrideTargetOrClusterScope(t *testing.T) {
+	for _, labels := range []map[string]string{
+		{"namespace": "other"}, {"job": "other"}, {"vhost": "other"}, {"queue": "other"}, {"__name__": "up"}, {"bad-label": "bad"}, {"cluster": "other"},
+	} {
+		cfg := Config{PrometheusURL: "http://prometheus", MatchLabels: map[string]string{"cluster": "prod"}, RabbitMQ: []cluster.QueueTarget{{ServiceID: "StatefulSet/shop/events", Job: "rabbitmq", VHost: "/", Queue: "orders", BrokerLabels: labels}}}
+		if _, err := New(cfg, "", []string{"shop"}); err == nil {
+			t.Fatalf("unsafe broker labels accepted: %+v", labels)
+		}
 	}
 }

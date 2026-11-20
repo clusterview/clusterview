@@ -192,3 +192,69 @@ func TestThrottlingExcludesPreviousContainerRateWindow(t *testing.T) {
 		t.Fatal("prior container's rate window used for restarted container")
 	}
 }
+
+func TestCPUUsageCannotProveThrottlingRecovery(t *testing.T) {
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		name    string
+		samples map[string]TelemetrySample
+		want    HealthState
+	}{
+		{"throttled", map[string]TelemetrySample{"shop/api-1/app": {Value: 60, Time: now}, "shop/api-1/sidecar": {Value: 0, Time: now}}, HealthCritical},
+		{"source unavailable", map[string]TelemetrySample{}, HealthUnknown},
+		{"container measurement missing", map[string]TelemetrySample{"shop/api-1/sidecar": {Value: 0, Time: now}}, HealthUnknown},
+		{"stale throttling", map[string]TelemetrySample{"shop/api-1/app": {Value: 0, Time: now.Add(-3 * time.Minute)}, "shop/api-1/sidecar": {Value: 0, Time: now}}, HealthUnknown},
+		{"fresh recovery", map[string]TelemetrySample{"shop/api-1/app": {Value: 0, Time: now}, "shop/api-1/sidecar": {Value: 0, Time: now}}, HealthHealthy},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			objs, metrics := healthFixture(now)
+			for i := range metrics[0].Containers {
+				metrics[0].Containers[i].Usage = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m"), corev1.ResourceMemory: resource.MustParse("10Mi")}
+			}
+			s := BuildSnapshot(objs, 1, now)
+			enrichHealth(&s, objs, metrics, TelemetryData{Throttling: tc.samples}, HealthPolicy{}, now)
+			h := s.Services[0].Health
+			if h.Checks["resource-cpu"] != HealthHealthy || h.Checks["resource-cpu-throttling"] != tc.want {
+				t.Fatalf("usage and throttling evidence conflated: %+v", h.Checks)
+			}
+			if h.CPU.State != tc.want {
+				t.Fatalf("CPU meter conceals throttling state: got %s, want %s", h.CPU.State, tc.want)
+			}
+			if tc.want == HealthCritical {
+				if len(s.Services[0].Problems) != 1 || s.Services[0].Problems[0].Kind != "resource-cpu-throttling" {
+					t.Fatalf("throttling incident has no independent identity: %+v", s.Services[0].Problems)
+				}
+			} else if len(s.Services[0].Problems) != 0 {
+				t.Fatalf("unobserved problem fabricated: %+v", s.Services[0].Problems)
+			}
+		})
+	}
+}
+
+func TestQueueCheckKeyIncludesStableBrokerIdentity(t *testing.T) {
+	a := QueueTarget{Job: "rabbitmq", VHost: "/", Queue: "orders", BrokerLabels: map[string]string{"service": "events", "cluster": "prod"}}
+	b := a
+	b.BrokerLabels = map[string]string{"cluster": "prod", "service": "events"}
+	if QueueCheckKey(a) != QueueCheckKey(b) {
+		t.Fatal("broker label iteration changed identity")
+	}
+	b.BrokerLabels = map[string]string{"service": "other", "cluster": "prod"}
+	if QueueCheckKey(a) == QueueCheckKey(b) {
+		t.Fatal("different brokers share a recovery check")
+	}
+}
+
+func TestCPUMeterIdentifiesThrottledContainerIndependentlyOfUsage(t *testing.T) {
+	now := time.Now().UTC()
+	objs, metrics := healthFixture(now)
+	extra := TelemetryData{Throttling: map[string]TelemetrySample{"shop/api-1/app": {Value: 0, Time: now}, "shop/api-1/sidecar": {Value: 60, Time: now}}}
+	s := BuildSnapshot(objs, 1, now)
+	enrichHealth(&s, objs, metrics, extra, HealthPolicy{}, now)
+	h := s.Services[0].Health
+	if h.CPU.Subject != "api-1/sidecar" || h.CPU.Usage == nil || *h.CPU.Usage != 10 || h.CPU.State != HealthCritical {
+		t.Fatalf("throttling attributed to a different container: %+v", h.CPU)
+	}
+	if h.Checks["resource-cpu"] != HealthWarning || h.Checks["resource-cpu-throttling"] != HealthCritical {
+		t.Fatalf("independent CPU conditions lost: %+v", h.Checks)
+	}
+}

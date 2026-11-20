@@ -60,6 +60,7 @@ monitoring:
   rabbitmq: []
   # - serviceId: rabbitmq.com/RabbitmqCluster/messaging/events
   #   job: rabbitmq-production
+  #   brokerLabels: {service: events} # Actual scrape labels for this broker cluster.
   #   vhost: /
   #   queue: orders
   #   warningMessages: 1000

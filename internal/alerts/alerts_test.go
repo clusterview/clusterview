@@ -457,3 +457,35 @@ func TestResourceWarningsAreOptInAndStillWait(t *testing.T) {
 		})
 	}
 }
+
+func TestLowCPUUsageCannotResolveMissingThrottlingEvidence(t *testing.T) {
+	r := &receiver{}
+	m, src := setup(t, r)
+	now := time.Now().UTC()
+	ctx := context.Background()
+	s := service(cluster.StatusHealthy)
+	s.Problems = []cluster.Problem{{Kind: "resource-cpu-throttling", Severity: cluster.SeverityCritical, Title: "CPU is being throttled"}}
+	s.Health = &cluster.ServiceHealth{Checks: map[string]cluster.HealthState{"resource-cpu": cluster.HealthHealthy, "resource-cpu-throttling": cluster.HealthCritical}}
+	src.services = []cluster.Service{s}
+	checkAt(ctx, m, now)
+	checkAt(ctx, m, now.Add(5*time.Minute))
+	if len(r.got()) != 1 {
+		t.Fatal("throttling alert didn't fire")
+	}
+	src.services[0].Problems = nil
+	src.services[0].Health.Checks["resource-cpu-throttling"] = cluster.HealthUnknown
+	checkAt(ctx, m, now.Add(6*time.Minute))
+	if len(r.got()) != 1 {
+		t.Fatal("healthy usage falsely resolved missing throttling")
+	}
+	delete(src.services[0].Health.Checks, "resource-cpu-throttling")
+	checkAt(ctx, m, now.Add(7*time.Minute))
+	if len(r.got()) != 1 {
+		t.Fatal("absent throttling check falsely resolved incident")
+	}
+	src.services[0].Health.Checks["resource-cpu-throttling"] = cluster.HealthHealthy
+	checkAt(ctx, m, now.Add(8*time.Minute))
+	if got := r.got(); len(got) != 2 || got[1].State != "resolved" {
+		t.Fatal("fresh throttling recovery didn't resolve")
+	}
+}

@@ -187,6 +187,10 @@
                 "type": "string",
                 "minLength": 1
               },
+              "brokerLabels": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              },
               "job": {
                 "type": "string",
                 "minLength": 1

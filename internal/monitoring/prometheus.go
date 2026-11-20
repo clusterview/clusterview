@@ -111,6 +111,14 @@ func New(cfg Config, token string, namespaces []string) (*Client, error) {
 		if ns == "" || (len(namespaces) > 0 && !slices.Contains(namespaces, ns)) {
 			return nil, errors.New("RabbitMQ target must be in a watched namespace")
 		}
+		for k, v := range q.BrokerLabels {
+			if !labelName.MatchString(k) || strings.HasPrefix(k, "__") || slices.Contains([]string{"namespace", "job", "vhost", "queue"}, k) {
+				return nil, errors.New("RabbitMQ brokerLabels contains an invalid or reserved label")
+			}
+			if global, ok := cfg.MatchLabels[k]; ok && global != v {
+				return nil, errors.New("RabbitMQ brokerLabels conflicts with monitoring.matchLabels")
+			}
+		}
 		if q.AckMode == "" {
 			q.AckMode = "manual"
 		}
@@ -137,22 +145,21 @@ func New(cfg Config, token string, namespaces []string) (*Client, error) {
 }
 
 func (c *Client) selector(metric string, labels map[string]string, scoped bool) string {
-	keys := make([]string, 0, len(c.cfg.MatchLabels))
-	for k := range c.cfg.MatchLabels {
+	all := make(map[string]string, len(c.cfg.MatchLabels)+len(labels))
+	for k, v := range c.cfg.MatchLabels {
+		all[k] = v
+	}
+	for k, v := range labels {
+		all[k] = v
+	}
+	keys := make([]string, 0, len(all))
+	for k := range all {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
 	var match []string
 	for _, k := range keys {
-		match = append(match, k+"="+strconv.Quote(c.cfg.MatchLabels[k]))
-	}
-	keys = keys[:0]
-	for k := range labels {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		match = append(match, k+"="+strconv.Quote(labels[k]))
+		match = append(match, k+"="+strconv.Quote(all[k]))
 	}
 	if scoped && len(c.namespaces) > 0 {
 		ns := make([]string, len(c.namespaces))
@@ -276,7 +283,11 @@ func (c *Client) Read(ctx context.Context) cluster.TelemetryData {
 	for i, target := range c.cfg.RabbitMQ {
 		result := &data.Queues[i]
 		result.QueueTarget = target
-		labels := map[string]string{"job": target.Job, "vhost": target.VHost, "queue": target.Queue}
+		parts := strings.Split(target.ServiceID, "/")
+		labels := map[string]string{"namespace": parts[len(parts)-2], "job": target.Job, "vhost": target.VHost, "queue": target.Queue}
+		for k, v := range target.BrokerLabels {
+			labels[k] = v
+		}
 		add := func(metric string, rate bool, dst **float64) {
 			sel := c.selector(metric, labels, false)
 			expression := fresh(sel)

@@ -55,6 +55,9 @@ monitoring:
   rabbitmq:
     - serviceId: rabbitmq.com/RabbitmqCluster/data/events
       job: rabbitmq
+      # Copy actual scrape labels identifying this logical broker cluster.
+      brokerLabels:
+        service: events
       vhost: /
       queue: orders
       warningMessages: 1000
@@ -67,9 +70,21 @@ Copy the exact `serviceId` from `/api/v1/snapshot`; operator-managed IDs include
 the API group and kind. Only discovered services in watched namespaces receive
 queue readings. Targets are explicit, with a maximum of 20; clusterview does not
 discover or contact brokers. `job`, `vhost` and `queue` match Prometheus labels
-exactly. Resource queries also restrict watched namespaces. Use `matchLabels`
-to avoid combining identically named resources or queues across clusters.
-Labels apply to all queries.
+exactly. Every queue query also selects the exact `namespace` from `serviceId`
+**before aggregation**, even when the dashboard watches all namespaces. The
+scraped RabbitMQ series must carry that namespace label; absent labels leave
+queue health unknown.
+
+Use per-target `brokerLabels` when multiple brokers in a namespace share a job,
+vhost and queue name. Select labels that identify the whole logical broker
+cluster, such as its scrape Service label, so all its HA nodes remain included.
+These equality matchers apply to every queue gauge and counter before summing.
+They cannot override namespace, job, vhost, queue or conflict with global labels.
+A job uniquely identifying a broker within its namespace can omit brokerLabels.
+
+Resource queries also restrict watched namespaces. Global `matchLabels` isolate
+identically named resources or queues across Kubernetes clusters and apply to
+all queries.
 
 Set `existingSecret` only if Prometheus needs bearer authentication. Its
 `bearerToken` key is read from the dashboard namespace. The server never returns
@@ -122,9 +137,13 @@ of application work. This check does not measure message age or end-to-end laten
 Critical resource and queue problems participate in existing sustained-failure
 alerts when alerts are enabled. Amber notifications additionally require
 `alerts.resourceWarnings: true`. All notifications wait for `alerts.for`, so a
-brief peak can colour the UI without sending a webhook. Previously failing
-checks need current evidence before recovery is sent; missing data is not
-recovery. See [service alerts](service-alerts.md).
+brief peak can colour the UI without sending a webhook. CPU usage and CPU
+throttling have separate check identities (`resource-cpu` and
+`resource-cpu-throttling`). Low metrics-server usage cannot resolve a throttling
+incident: fresh throttling evidence is required for the current containers.
+Missing/stale throttling series remain unknown when Prometheus is configured.
+Previously failing checks need current evidence before recovery is sent;
+missing data is not recovery. See [service alerts](service-alerts.md).
 
 Run the frontend and open `/?mock=health&ai=off` for examples of healthy,
 warning, critical and unavailable readings, including a stalled RabbitMQ queue.

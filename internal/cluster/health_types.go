@@ -67,12 +67,14 @@ type ServiceHealth struct {
 // QueueTarget explicitly associates a Prometheus job and queue with a discovered
 // service. This avoids guessing the cluster or service from a queue name.
 type QueueTarget struct {
-	ServiceID        string `json:"serviceId"`
-	Job              string `json:"job"`
-	VHost            string `json:"vhost"`
-	Queue            string `json:"queue"`
-	WarningMessages  int64  `json:"warningMessages"`
-	CriticalMessages int64  `json:"criticalMessages"`
+	ServiceID string `json:"serviceId"`
+	Job       string `json:"job"`
+	VHost     string `json:"vhost"`
+	Queue     string `json:"queue"`
+	// BrokerLabels selects one logical broker cluster within its namespace.
+	BrokerLabels     map[string]string `json:"brokerLabels,omitempty"`
+	WarningMessages  int64             `json:"warningMessages"`
+	CriticalMessages int64             `json:"criticalMessages"`
 	// Pull consumers and intentionally delayed queues can disable this check.
 	AllowNoConsumers bool `json:"allowNoConsumers"`
 	// auto uses automatic delivery/get counters instead of manual acknowledgements.

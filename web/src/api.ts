@@ -39,6 +39,7 @@ export interface ContainerHealth {
 
 export interface QueueHealth {
   serviceId: string;
+  brokerLabels?: Record<string, string>;
   job: string;
   vhost: string;
   queue: string;
