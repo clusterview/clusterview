@@ -2,15 +2,10 @@ import type { PodState, Service, Workload } from "../api";
 import { describeSchedule } from "../format-cron";
 import { CategoryIcon } from "./CategoryIcon";
 
-export type Tone = "down" | "degraded" | "warning" | "healthy" | "idle" | "unknown";
-
-/** The one word that drives a service's look. */
-export function toneOf(s: Service): Tone {
-  if (s.status === "down" || s.status === "degraded") return s.status;
-  if (s.problems.some((p) => p.severity === "warning")) return "warning";
-  if (s.status === "idle" || s.status === "unknown") return s.status;
-  return "healthy";
-}
+import { healthReason, toneOf } from "../health";
+import { ResourceBars } from "./ResourceHealth";
+export { toneOf } from "../health";
+export type { Tone } from "../health";
 
 const MAX_PIPS = 12;
 
@@ -49,8 +44,10 @@ export function ServiceCard({ service: s, workloads, selected, showNamespace, di
   const schedule = workloads.find((w) => w.schedule);
 
   let line: React.ReactNode;
-  if (problem && (tone === "down" || tone === "degraded" || tone === "warning")) {
+  if (problem && (tone === "down" || tone === "degraded" || tone === "warning" || tone === "critical")) {
     line = <span className={`cv-card-problem is-${problem.severity}`}>{problem.title}</span>;
+  } else if (healthReason(s)) {
+    line = <span className="cv-card-desc">{healthReason(s)}</span>;
   } else if (dependsOnBroken) {
     line = <span className="cv-card-problem is-warning">{dependsOnBroken} is down</span>;
   } else if (schedule?.schedule) {
@@ -62,7 +59,7 @@ export function ServiceCard({ service: s, workloads, selected, showNamespace, di
   return (
     <article
       className={`cv-card is-${tone}${selected ? " is-selected" : ""}${dimmed ? " is-dimmed" : ""}`}
-      aria-label={`${s.title}: ${s.status}${problem ? `, ${problem.title}` : ""}`}
+      aria-label={`${s.title}: ${tone}${problem ? `, ${problem.title}` : ""}`}
     >
       {tone === "down" && <span className="cv-card-alarm" aria-hidden />}
       <header className="cv-card-head">
@@ -78,6 +75,13 @@ export function ServiceCard({ service: s, workloads, selected, showNamespace, di
         </div>
         <span className={`cv-status is-${tone}`} aria-hidden />
       </header>
+      {s.health && <ResourceBars health={s.health} />}
+      {!!s.health?.queues?.length && <div className="cv-card-queue" title={s.health.queues.map((q) => `${q.queue}: ${q.reason}`).join("; ")}>
+        {s.health.queues[0].ready === undefined ? "Queue: no data" : `${s.health.queues[0].ready.toLocaleString()} waiting`}
+        {s.health.queues[0].processRate !== undefined && <> · {s.health.queues[0].processRate.toFixed(1)}/s processed</>}
+        {s.health.queues.length > 1 && <> · +{s.health.queues.length - 1} queues</>}
+      </div>}
+      {s.category === "queue" && !s.health?.queues?.length && <div className="cv-card-queue">Queue flow: not monitored</div>}
       <footer className="cv-card-foot" title={problem?.detail ?? dependsOnBroken ?? s.description}>
         {s.desired > 0 && !schedule && (
           <span className="cv-replicas">

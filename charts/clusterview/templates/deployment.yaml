@@ -1,4 +1,5 @@
 {{- include "clusterview.checkActions" . }}
+{{- include "clusterview.checkMonitoring" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,6 +49,13 @@ spec:
               value: {{ join "," .Values.scope.namespaces | quote }}
             - name: CLUSTERVIEW_NODES
               value: {{ .Values.scope.nodes | quote }}
+            - name: CLUSTERVIEW_MONITORING
+              value: {{ omit .Values.monitoring "existingSecret" | toJson | quote }}
+            {{- with .Values.monitoring.existingSecret }}
+            - name: CLUSTERVIEW_MONITORING_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef: {name: {{ . | quote }}, key: bearerToken}
+            {{- end }}
             - name: CLUSTERVIEW_ACTIONS
               value: {{ .Values.actions.enabled | quote }}
             - name: CLUSTERVIEW_ACTIONS_NAMESPACES
@@ -114,6 +122,8 @@ spec:
                 secretKeyRef:
                   name: {{ required "alerts.existingSecret is required when alerts are enabled" .Values.alerts.existingSecret | quote }}
                   key: webhookURL
+            - name: CLUSTERVIEW_ALERTS_RESOURCE_WARNINGS
+              value: {{ .Values.alerts.resourceWarnings | quote }}
             - name: CLUSTERVIEW_ALERTS_FORMAT
               value: {{ .Values.alerts.format | quote }}
             - name: CLUSTERVIEW_ALERTS_FOR

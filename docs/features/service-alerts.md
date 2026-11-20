@@ -48,7 +48,10 @@ The monitor waits for the cluster cache to sync, then checks every 15 seconds.
 It sees exactly the namespaces configured for the dashboard.
 
 1. A service is broken when its status is down or degraded, or it has a critical
-   problem. Warning-only problems don't start an incident.
+   problem, including critical resource or queue health. Warning-only problems
+   don't start an incident unless `alerts.resourceWarnings: true` enables
+   resource and queue warnings (`--alerts-resource-warnings` or
+   `CLUSTERVIEW_ALERTS_RESOURCE_WARNINGS=true` on a laptop).
 2. An incident starts when the monitor first observes the failure. It must
    remain broken for `alerts.for` (default `5m`) before a notification is sent.
    Healthy, idle or unknown status before that resets the window.
@@ -56,7 +59,11 @@ It sees exactly the namespaces configured for the dashboard.
    notifications for that incident, even when the failure's symptoms change.
 4. It sends recovery only after a notified service becomes healthy or idle,
    with no critical problems. Unknown status isn't recovery. If the service
-   disappears, its incident is forgotten without claiming recovery.
+   disappears, its incident is forgotten without claiming recovery. For a
+   resource or queue incident, its previously failing checks must also have
+   current measurements. Losing the metrics source never sends recovery.
+   With warning notifications off, an observed improvement from critical to
+   warning resolves the critical incident.
 5. After recovery, a new failure must pass through the full waiting window again.
 
 Timing has the resolution of the polling interval and webhook delivery time.
@@ -94,7 +101,7 @@ A structured webhook event looks like:
 Recovery uses `state: resolved` and the service's current health. Each POST
 has `Content-Type: application/json` and `Idempotency-Key` equal to the event
 ID. Retries keep that ID. A new incident and its recovery have different IDs.
-Only service identity, health and critical problem kinds/titles leave the
+Only service identity, health and included problem kinds/titles leave the
 cluster. Logs, environment values, pod specs and raw event/problem detail
 aren't included. The destination URL and response bodies are never logged.
 

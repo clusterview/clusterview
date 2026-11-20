@@ -48,6 +48,7 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
+        "resourceWarnings": { "type": "boolean" },
         "existingSecret": { "type": "string" },
         "format": { "type": "string", "enum": ["webhook", "slack", "teams"] },
         "for": { "type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$" },
@@ -131,6 +132,98 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "ingressFrom": { "type": "array" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prometheusURL": {
+          "type": "string"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "matchLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warningPercent": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 100
+            },
+            "criticalPercent": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "warningPercent",
+            "criticalPercent"
+          ]
+        },
+        "rabbitmq": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "serviceId",
+              "job",
+              "vhost",
+              "queue"
+            ],
+            "properties": {
+              "serviceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brokerLabels": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              },
+              "job": {
+                "type": "string",
+                "minLength": 1
+              },
+              "vhost": {
+                "type": "string",
+                "minLength": 1
+              },
+              "queue": {
+                "type": "string",
+                "minLength": 1
+              },
+              "warningMessages": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "criticalMessages": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "ackMode": {
+                "type": "string",
+                "enum": [
+                  "manual",
+                  "auto"
+                ]
+              },
+              "allowNoConsumers": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       }
     },
     "resources": { "type": "object" },
