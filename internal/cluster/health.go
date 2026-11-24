@@ -72,6 +72,24 @@ func worstReading(all []ResourceReading, empty ResourceReading) ResourceReading 
 	return best
 }
 
+// recoveryState requires every current subject to have an observation. Display
+// severity can still show a known problem while another subject is unknown.
+func recoveryState(all []ResourceReading) HealthState {
+	if len(all) == 0 {
+		return HealthUnknown
+	}
+	state := HealthHealthy
+	for _, r := range all {
+		if r.State == HealthUnknown || r.State == "" {
+			return HealthUnknown
+		}
+		if healthRank(r.State) > healthRank(state) {
+			state = r.State
+		}
+	}
+	return state
+}
+
 // QueueCheckKey is stable even when queue names contain separators.
 func QueueCheckKey(q QueueTarget) string {
 	key := "queue:" + strconv.Quote(q.Job) + ":" + strconv.Quote(q.VHost) + ":" + strconv.Quote(q.Queue)
@@ -265,10 +283,19 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 			}
 		}
 		if active {
-			h := &ServiceHealth{CPU: worstReading(cpus, unknownReading("millicores", "metrics-server", "No current container metrics")), Memory: worstReading(mems, unknownReading("bytes", "metrics-server", "No current container metrics")), Checks: map[string]HealthState{}}
+			h := &ServiceHealth{
+				CPU:    worstReading(cpus, unknownReading("millicores", "metrics-server", "No current container metrics")),
+				Memory: worstReading(mems, unknownReading("bytes", "metrics-server", "No current container metrics")),
+				Checks: map[string]HealthState{
+					"resource-cpu":            recoveryState(cpus),
+					"resource-memory":         recoveryState(mems),
+					"resource-cpu-throttling": recoveryState(throttles),
+				},
+			}
 			if len(disks) > 0 {
 				d := worstReading(disks, ResourceReading{})
 				h.Disk = &d
+				h.Checks["resource-disk"] = recoveryState(disks)
 			}
 			resources := []struct {
 				key, label string
@@ -277,7 +304,6 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 			// Usage and throttling are independent evidence. A low usage sample
 			// cannot prove recovery from an incident caused by throttling.
 			throttle := worstReading(throttles, unknownReading("percent", "prometheus", "No current throttling metrics"))
-			h.Checks["resource-cpu-throttling"] = throttle.State
 			if extra.Throttling != nil {
 				resources = append(resources, struct {
 					key, label string
@@ -293,7 +319,6 @@ func enrichHealth(s *Snapshot, objs Objects, metrics []metricsv1beta1.PodMetrics
 			h.State = HealthHealthy
 			for _, item := range resources {
 				r := item.r
-				h.Checks[item.key] = r.State
 				if healthRank(r.State) > healthRank(h.State) {
 					h.State = r.State
 				}

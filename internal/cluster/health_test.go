@@ -258,3 +258,73 @@ func TestCPUMeterIdentifiesThrottledContainerIndependentlyOfUsage(t *testing.T) 
 		t.Fatalf("independent CPU conditions lost: %+v", h.Checks)
 	}
 }
+
+func TestResourceWarningDoesNotMaskIncompleteRecoveryEvidence(t *testing.T) {
+	now := time.Now().UTC()
+	for _, metric := range []string{"cpu-throttling", "memory", "disk"} {
+		t.Run(metric, func(t *testing.T) {
+			objs, metrics := healthFixture(now)
+			for i := range metrics[0].Containers {
+				metrics[0].Containers[i].Usage = corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m"), corev1.ResourceMemory: resource.MustParse("10Mi")}
+			}
+			extra := TelemetryData{}
+			switch metric {
+			case "cpu-throttling":
+				extra.Throttling = map[string]TelemetrySample{"shop/api-1/app": {Value: 60, Time: now}, "shop/api-1/sidecar": {Value: 30, Time: now}}
+			case "memory":
+				metrics[0].Containers[0].Usage[corev1.ResourceMemory] = resource.MustParse("980Mi")
+				metrics[0].Containers[1].Usage[corev1.ResourceMemory] = resource.MustParse("900Mi")
+			case "disk":
+				for _, claim := range []string{"a", "b"} {
+					objs.Pods[0].Spec.Volumes = append(objs.Pods[0].Spec.Volumes, corev1.Volume{Name: claim, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claim}}})
+				}
+				extra.Volumes = map[string]VolumeSample{
+					"shop/a": {Used: TelemetrySample{Value: 96, Time: now}, Capacity: TelemetrySample{Value: 100, Time: now}},
+					"shop/b": {Used: TelemetrySample{Value: 90, Time: now}, Capacity: TelemetrySample{Value: 100, Time: now}},
+				}
+			}
+			observe := func() (HealthState, HealthState) {
+				s := BuildSnapshot(objs, 1, now)
+				enrichHealth(&s, objs, metrics, extra, HealthPolicy{}, now)
+				h := s.Services[0].Health
+				display := h.CPU.State
+				if metric == "memory" {
+					display = h.Memory.State
+				}
+				if metric == "disk" {
+					display = h.Disk.State
+				}
+				return display, h.Checks["resource-"+metric]
+			}
+			if display, check := observe(); display != HealthCritical || check != HealthCritical {
+				t.Fatalf("initial critical evidence missing: display %s, recovery %s", display, check)
+			}
+			app := metrics[0].Containers[0]
+			switch metric {
+			case "cpu-throttling":
+				delete(extra.Throttling, "shop/api-1/app")
+			case "memory":
+				metrics[0].Containers = metrics[0].Containers[1:]
+			case "disk":
+				delete(extra.Volumes, "shop/a")
+			}
+			if display, check := observe(); display != HealthWarning || check != HealthUnknown {
+				t.Fatalf("warning hid missing critical evidence: display %s, recovery %s", display, check)
+			}
+			// A fresh observation below critical permits a critical-only incident to
+			// recover, while B's observed warning stays visible.
+			switch metric {
+			case "cpu-throttling":
+				extra.Throttling["shop/api-1/app"] = TelemetrySample{Value: 0, Time: now}
+			case "memory":
+				app.Usage[corev1.ResourceMemory] = resource.MustParse("10Mi")
+				metrics[0].Containers = append([]metricsv1beta1.ContainerMetrics{app}, metrics[0].Containers...)
+			case "disk":
+				extra.Volumes["shop/a"] = VolumeSample{Used: TelemetrySample{Value: 10, Time: now}, Capacity: TelemetrySample{Value: 100, Time: now}}
+			}
+			if display, check := observe(); display != HealthWarning || check != HealthWarning {
+				t.Fatalf("complete observed improvement lost: display %s, recovery %s", display, check)
+			}
+		})
+	}
+}

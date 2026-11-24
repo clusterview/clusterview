@@ -489,3 +489,51 @@ func TestLowCPUUsageCannotResolveMissingThrottlingEvidence(t *testing.T) {
 		t.Fatal("fresh throttling recovery didn't resolve")
 	}
 }
+
+func TestWarningDoesNotResolveIncompleteCriticalEvidence(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			r := &receiver{}
+			m, src := setup(t, r)
+			m.cfg.ResourceWarnings = enabled
+			now := time.Now().UTC()
+			ctx := context.Background()
+			s := service(cluster.StatusHealthy)
+			s.Problems = []cluster.Problem{{Kind: "resource-cpu-throttling", Severity: cluster.SeverityCritical, Title: "CPU is being throttled"}}
+			s.Health = &cluster.ServiceHealth{Checks: map[string]cluster.HealthState{"resource-cpu-throttling": cluster.HealthCritical}}
+			src.services = []cluster.Service{s}
+			checkAt(ctx, m, now)
+			checkAt(ctx, m, now.Add(5*time.Minute))
+			if got := r.got(); len(got) != 1 || got[0].State != "firing" {
+				t.Fatal("critical throttling incident didn't notify")
+			}
+
+			// Container A's critical measurement disappears while B still warns.
+			src.services[0].Problems[0].Severity = cluster.SeverityWarning
+			src.services[0].Health.Checks["resource-cpu-throttling"] = cluster.HealthUnknown
+			checkAt(ctx, m, now.Add(6*time.Minute))
+			if len(r.got()) != 1 {
+				t.Fatal("known warning resolved missing critical evidence")
+			}
+
+			// A fresh healthy reading for A leaves complete warning evidence for B.
+			src.services[0].Health.Checks["resource-cpu-throttling"] = cluster.HealthWarning
+			checkAt(ctx, m, now.Add(7*time.Minute))
+			want := 2
+			if enabled {
+				want = 1
+			}
+			if len(r.got()) != want {
+				t.Fatal("complete warning evidence ignored notification policy")
+			}
+
+			src.services[0].Problems = nil
+			src.services[0].Health.Checks["resource-cpu-throttling"] = cluster.HealthHealthy
+			checkAt(ctx, m, now.Add(8*time.Minute))
+			checkAt(ctx, m, now.Add(9*time.Minute))
+			if got := r.got(); len(got) != 2 || got[1].State != "resolved" {
+				t.Fatal("complete improvement should resolve exactly once")
+			}
+		})
+	}
+}

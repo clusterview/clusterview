@@ -56,11 +56,13 @@ type ContainerHealth struct {
 // ServiceHealth is the worst observed container/volume, not an average which
 // could hide a single container approaching its limit.
 type ServiceHealth struct {
-	State  HealthState            `json:"state"`
-	CPU    ResourceReading        `json:"cpu"`
-	Memory ResourceReading        `json:"memory"`
-	Disk   *ResourceReading       `json:"disk,omitempty"`
-	Queues []QueueHealth          `json:"queues,omitempty"`
+	State  HealthState      `json:"state"`
+	CPU    ResourceReading  `json:"cpu"`
+	Memory ResourceReading  `json:"memory"`
+	Disk   *ResourceReading `json:"disk,omitempty"`
+	Queues []QueueHealth    `json:"queues,omitempty"`
+	// Resource checks require complete evidence for recovery, even when a known
+	// warning or critical reading takes priority in the displayed severity.
 	Checks map[string]HealthState `json:"checks"`
 }
 

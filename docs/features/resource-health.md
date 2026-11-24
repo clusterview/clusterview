@@ -142,6 +142,11 @@ throttling have separate check identities (`resource-cpu` and
 `resource-cpu-throttling`). Low metrics-server usage cannot resolve a throttling
 incident: fresh throttling evidence is required for the current containers.
 Missing/stale throttling series remain unknown when Prometheus is configured.
+Resource recovery checks require measurements for every current container or PVC.
+A known warning or critical reading stays visible when another measurement is
+missing, but that partial evidence cannot resolve an existing incident. Once all
+measurements are available, a warning can resolve a critical-only incident;
+with warning notifications enabled, it remains active until healthy.
 Previously failing checks need current evidence before recovery is sent;
 missing data is not recovery. See [service alerts](service-alerts.md).
 
