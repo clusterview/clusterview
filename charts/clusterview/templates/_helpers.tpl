@@ -85,3 +85,19 @@ admission-policy.yaml holding each request to what the action needs.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{- define "clusterview.checkMonitoring" -}}
+{{- if ge (float64 .Values.monitoring.resources.warningPercent) (float64 .Values.monitoring.resources.criticalPercent) }}
+{{- fail "monitoring.resources.warningPercent must be below criticalPercent" }}
+{{- end }}
+{{- if and (not .Values.monitoring.prometheusURL) .Values.monitoring.rabbitmq }}
+{{- fail "monitoring.rabbitmq requires monitoring.prometheusURL" }}
+{{- end }}
+{{- range .Values.monitoring.rabbitmq }}
+{{- $warning := .warningMessages | default 1000 | int64 }}
+{{- $critical := .criticalMessages | default 10000 | int64 }}
+{{- if ge $warning $critical }}
+{{- fail "RabbitMQ warningMessages must be below criticalMessages" }}
+{{- end }}
+{{- end }}
+{{- end }}

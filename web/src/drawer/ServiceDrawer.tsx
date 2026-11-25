@@ -10,6 +10,7 @@ import { FindError } from "./FindError";
 import { LogsTab } from "./LogsTab";
 import { Connections } from "./Connections";
 import { ServiceActions, PodRestartButton, canActIn } from "./actions";
+import { HealthDetails } from "./HealthDetails";
 import "./drawer.css";
 
 type Tab = "overview" | "logs" | "events";
@@ -75,7 +76,7 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
       </header>
 
       <div className="cv-drawer-status">
-        <StatusPill status={tone === "warning" ? "warning" : s.status} />
+        <StatusPill status={tone} />
         {s.desired > 0 && (
           <span className="cv-drawer-replicas">
             <PodPips pods={workloads.filter((w) => w.kind !== "Job" && w.kind !== "CronJob").flatMap((w) => w.pods)} desired={s.desired} />
@@ -108,6 +109,8 @@ export function ServiceDrawer({ service: s, snapshot, me, actions, ai, onClose, 
                 {ai?.enabled && <FindError service={s} ai={ai} />}
               </section>
             )}
+
+            <HealthDetails service={s} pods={pods} />
 
             {s.description && (
               <section className="cv-section">

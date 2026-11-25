@@ -10,7 +10,7 @@ RUN npm run build
 
 # 2. Build the binary with the UI embedded. Cross-compiles, so the multi-arch
 #    build doesn't run under emulation.
-FROM --platform=$BUILDPLATFORM golang:1.27 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4 AS build
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev COMMIT=unknown
 WORKDIR /src

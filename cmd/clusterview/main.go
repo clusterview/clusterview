@@ -33,21 +33,24 @@ import (
 	"github.com/clusterview/clusterview/internal/cluster"
 	"github.com/clusterview/clusterview/internal/diagnose"
 	"github.com/clusterview/clusterview/internal/kube"
+	"github.com/clusterview/clusterview/internal/monitoring"
 	"github.com/clusterview/clusterview/internal/version"
 	"github.com/clusterview/clusterview/web"
 )
 
 type config struct {
-	addr        string
-	kubeconfig  string
-	kubeContext string
-	open        bool
-	scope       cluster.Options
-	actions     actions.Config
-	auth        auth.Config
-	ai          ai.Config
-	alerts      alerts.Config
-	basePath    string
+	addr             string
+	kubeconfig       string
+	kubeContext      string
+	open             bool
+	scope            cluster.Options
+	actions          actions.Config
+	auth             auth.Config
+	ai               ai.Config
+	alerts           alerts.Config
+	basePath         string
+	monitoring       monitoring.Config
+	monitoringBearer string
 }
 
 func main() {
@@ -88,6 +91,7 @@ func main() {
 	flag.StringVar(&cfg.alerts.Format, "alerts-format", envOr("CLUSTERVIEW_ALERTS_FORMAT", "webhook"), "alert payload: webhook, slack or teams")
 	flag.StringVar(&cfg.alerts.Cluster, "alerts-cluster", os.Getenv("CLUSTERVIEW_ALERTS_CLUSTER"), "cluster name in notifications (default: kubeconfig context, or cluster)")
 	flag.StringVar(&cfg.alerts.DashboardURL, "alerts-dashboard-url", os.Getenv("CLUSTERVIEW_ALERTS_DASHBOARD_URL"), "dashboard URL to include in notifications")
+	flag.BoolVar(&cfg.alerts.ResourceWarnings, "alerts-resource-warnings", envOr("CLUSTERVIEW_ALERTS_RESOURCE_WARNINGS", "false") == "true", "also notify sustained resource and queue warnings")
 	flag.Parse()
 
 	if *showVersion {
@@ -95,6 +99,12 @@ func main() {
 		return
 	}
 	var err error
+	cfg.monitoring, err = monitoring.Parse(os.Getenv("CLUSTERVIEW_MONITORING"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	cfg.monitoringBearer = os.Getenv("CLUSTERVIEW_MONITORING_BEARER_TOKEN")
 	cfg.alerts.For, err = time.ParseDuration(*alertFor)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "alerts-for must be a duration, such as 5m")
@@ -139,6 +149,11 @@ func run(cfg config, log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	telemetry, err := monitoring.New(cfg.monitoring, cfg.monitoringBearer, cfg.scope.Namespaces)
+	if err != nil {
+		return fmt.Errorf("monitoring setup: %w", err)
+	}
+	cfg.scope.Health = cfg.monitoring.Resources
 	authn, err := auth.New(ctx, cfg.auth, log)
 	if err != nil {
 		return fmt.Errorf("sign-in setup: %w", err)
@@ -163,6 +178,9 @@ func run(cfg config, log *slog.Logger) error {
 	} else {
 		log.Info("cluster client ready", "mode", k.Mode, "context", k.Context, "namespaces", cfg.scope.Namespaces, "nodes", cfg.scope.Nodes)
 		c = cluster.NewCache(k, cfg.scope, log)
+		if telemetry != nil {
+			c.SetTelemetry(telemetry)
+		}
 		if model != nil && cfg.ai.Describe {
 			describer := ai.NewDescriber(model, c.Refresh, log)
 			c.SetGuesser(describer)

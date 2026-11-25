@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import type { Service, Snapshot, Workload } from "../api";
 import { CategoryIcon, categoryLabel } from "../components/CategoryIcon";
 import { PodPips, toneOf } from "../components/ServiceCard";
+import { ResourceBars } from "../components/ResourceHealth";
+import { healthReason } from "../health";
 import { describeSchedule } from "../format-cron";
 import { isSystemNamespace, needsAttention } from "../map/graph";
 import "./views.css";
@@ -126,13 +128,14 @@ function ServiceRow({
           )}
         </span>
         <span className="cv-row-line">
+          {s.health && <span className="cv-row-resources"><ResourceBars health={s.health} /></span>}
           {problem ? (
             <span className={`cv-card-problem is-${problem.severity}`}>
               {problem.title}
               {problem.detail && <span className="cv-row-detail"> · {problem.detail}</span>}
             </span>
           ) : (
-            <span className="cv-card-desc">{s.description}</span>
+            <span className="cv-card-desc">{healthReason(s) ?? s.description}</span>
           )}
         </span>
       </button>

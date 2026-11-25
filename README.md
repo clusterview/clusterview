@@ -263,6 +263,14 @@ a bad image, missing config, a failing probe), see
 [`test/eval/failures.yaml`](test/eval/failures.yaml) and
 [`hack/find-error-eval.sh`](hack/find-error-eval.sh).
 
+### Resource and queue health
+
+Cards and the service drawer show coloured CPU, memory and persistent-volume
+meters: green, amber, red, or grey when measurements are unavailable. Ready
+pods can still need attention because of resource pressure or stalled queues.
+CPU and memory use metrics-server; disk usage, CPU throttling and RabbitMQ flow
+use an optional Prometheus connection. See [setup and thresholds](docs/features/resource-health.md).
+
 ### Alerts
 
 Optionally notify Slack, Teams or a custom webhook when a service stays
@@ -310,7 +318,7 @@ You need Go (see `go.mod`), Node 24, Docker, Helm and kind.
 | `make web build` | Build the UI, then the binary with the UI inside it |
 | `make run` | Run the binary against your current kubeconfig context |
 | `cd web && npm run dev` | UI with hot reload on :5173, calling the binary on :8080 |
-| `http://localhost:5173/?mock=demo` | The UI on fixture data, no cluster needed (`?mock=kind` for a cluster with a lot broken; add `&theme=dark`, `&select=<service id>`, `&tab=logs`) |
+| `http://localhost:5173/?mock=demo` | The UI on fixture data, no cluster needed (`?mock=health` for resource and queue states, `?mock=kind` for a cluster with a lot broken; add `&theme=dark`, `&select=<service id>`, `&tab=logs`) |
 | `make test lint chart-lint` | Tests and linters, as CI runs them |
 | `make kind-up kind-install` | Create a local kind cluster and install the chart from your working tree |
 | `make kind-down` | Delete that cluster |

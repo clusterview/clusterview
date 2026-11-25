@@ -22,16 +22,17 @@ export function Button({ variant = "secondary", size = "md", icon, children, cla
 
 /* Status pill: "Down", "Healthy"… */
 
-const statusWords: Record<Status | "warning", string> = {
+const statusWords: Record<Status | "warning" | "critical", string> = {
   healthy: "Healthy",
   idle: "Idle",
   degraded: "Partly running",
   down: "Down",
   unknown: "Unknown",
   warning: "Needs a look",
+  critical: "Critical",
 };
 
-export function StatusPill({ status }: { status: Status | "warning" }) {
+export function StatusPill({ status }: { status: Status | "warning" | "critical" }) {
   return (
     <span className={`cv-pill is-${status}`}>
       <span className="cv-pill-dot" />

@@ -45,14 +45,17 @@ type Cache struct {
 
 	guesser Guesser
 
-	mu         sync.Mutex
-	subs       map[chan uint64]struct{}
-	snap       *Snapshot
-	healthSnap *Snapshot
-	nodeMet    []metricsv1beta1.NodeMetrics
-	podMet     []metricsv1beta1.PodMetrics
-	hasMet     bool
-	metError   string
+	mu            sync.Mutex
+	subs          map[chan uint64]struct{}
+	snap          *Snapshot
+	healthSnap    *Snapshot
+	nodeMet       []metricsv1beta1.NodeMetrics
+	podMet        []metricsv1beta1.PodMetrics
+	hasMet        bool
+	metError      string
+	telemetry     Telemetry
+	extra         TelemetryData
+	healthHistory map[string][]HealthPoint
 }
 
 // Options choose what the cache watches.
@@ -61,7 +64,8 @@ type Options struct {
 	Namespaces []string
 	// Nodes watches the cluster's nodes for the nodes view. It needs
 	// cluster-wide read access to nodes.
-	Nodes bool
+	Nodes  bool
+	Health HealthPolicy
 }
 
 // scope is the watches for one namespace, or "" for all of them.
@@ -128,6 +132,9 @@ func NewCache(k *kube.Client, opts Options, log *slog.Logger) *Cache {
 // SetGuesser describes unknown services with g. Call before Start.
 func (c *Cache) SetGuesser(g Guesser) { c.guesser = g }
 
+// SetTelemetry enables optional read-only monitoring. Call before Start.
+func (c *Cache) SetTelemetry(t Telemetry) { c.telemetry = t }
+
 // Refresh rebuilds the view, for when something outside the cluster (a
 // guesser's answers) changed it.
 func (c *Cache) Refresh() { c.touch() }
@@ -164,6 +171,9 @@ func (c *Cache) Start(ctx context.Context) bool {
 	}
 	go c.broadcast(ctx)
 	go c.pollMetrics(ctx)
+	if c.telemetry != nil {
+		go c.pollTelemetry(ctx)
+	}
 	for _, f := range c.factories() {
 		for typ, ok := range f.WaitForCacheSync(ctx.Done()) {
 			if !ok {
@@ -295,8 +305,15 @@ func (c *Cache) HealthSnapshot() Snapshot {
 	}
 	c.mu.Unlock()
 
-	s := BuildSnapshot(c.objects(), v, time.Now().UTC())
+	objs := c.objects()
+	now := time.Now().UTC()
+	s := BuildSnapshot(objs, v, now)
 	c.mu.Lock()
+	metrics, extra := c.podMet, c.extra
+	c.mu.Unlock()
+	enrichHealth(&s, objs, metrics, extra, c.opts.Health, now)
+	c.mu.Lock()
+	c.recordHealthHistory(&s)
 	c.healthSnap = &s
 	c.mu.Unlock()
 	return s
@@ -373,6 +390,7 @@ func (c *Cache) readMetrics(ctx context.Context) {
 			c.metError = err.Error()
 		}
 		c.hasMet, c.nodeMet, c.podMet = false, nil, nil
+		c.touch()
 		return
 	}
 	if c.metError != "" || !c.hasMet {
@@ -381,4 +399,65 @@ func (c *Cache) readMetrics(ctx context.Context) {
 	c.metError = ""
 	c.hasMet, c.nodeMet, c.podMet = true, nodeItems, podItems
 	c.touch()
+}
+
+// pollTelemetry never blocks dashboard requests. Each refresh replaces the
+// previous result, including partial/failed reads.
+func (c *Cache) pollTelemetry(ctx context.Context) {
+	tick := time.NewTicker(metricsEvery)
+	defer tick.Stop()
+	for {
+		readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		data := c.telemetry.Read(readCtx)
+		cancel()
+		c.mu.Lock()
+		c.extra = data
+		c.mu.Unlock()
+		c.touch()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+// recordHealthHistory runs under mu and copies published histories so future
+// refreshes cannot mutate a snapshot being read by a browser or alert monitor.
+func (c *Cache) recordHealthHistory(s *Snapshot) {
+	if c.healthHistory == nil {
+		c.healthHistory = map[string][]HealthPoint{}
+	}
+	seen := map[string]bool{}
+	for i := range s.Services {
+		svc := &s.Services[i]
+		if svc.Health == nil {
+			continue
+		}
+		readings := map[string]*ResourceReading{"cpu": &svc.Health.CPU, "memory": &svc.Health.Memory}
+		if svc.Health.Disk != nil {
+			readings["disk"] = svc.Health.Disk
+		}
+		for name, r := range readings {
+			key := svc.ID + "/" + name + "/" + r.Subject
+			seen[key] = true
+			if r.Percent == nil || r.ObservedAt == nil {
+				continue
+			}
+			history := slices.Clone(c.healthHistory[key])
+			if len(history) == 0 || r.ObservedAt.After(history[len(history)-1].Time) {
+				history = append(history, HealthPoint{Time: *r.ObservedAt, Value: *r.Percent})
+			}
+			if len(history) > 40 {
+				history = slices.Clone(history[len(history)-40:])
+			}
+			c.healthHistory[key] = history
+			r.History = slices.Clone(history)
+		}
+	}
+	for key := range c.healthHistory {
+		if !seen[key] {
+			delete(c.healthHistory, key)
+		}
+	}
 }
